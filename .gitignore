@@ -1,3 +1,4 @@
 .env
 data-cache/
 node_modules/
+data/family-picks.json

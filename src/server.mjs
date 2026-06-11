@@ -143,6 +143,40 @@ async function refreshData() {
 refreshData();
 setInterval(refreshData, 24 * 3600 * 1000).unref();
 
+// ---- family prediction game: anyone adds their name + pick, auto-scored
+// against real results once the daily refresh ingests them.
+import { matches as allMatches } from "./results.mjs";
+const FAMILY = new URL("../data/family-picks.json", import.meta.url);
+const loadFamily = () => existsSync(FAMILY) ? JSON.parse(readFileSync(FAMILY, "utf8")) : [];
+const saveFamily = (arr) => { mkdirSync(new URL("../data/", import.meta.url), { recursive: true }); writeFileSync(FAMILY, JSON.stringify(arr, null, 1)); };
+
+// find the real result for a pick: same two teams, played within 14 days after the pick
+function resultForPick(p) {
+  const pickTs = Math.floor(new Date(p.date).getTime() / 1000);
+  for (const m of allMatches) {
+    if (m.ts < pickTs - 43200 || m.ts > pickTs + 14 * 86400) continue;
+    const hs = sideSlugCached(m, "home"), as = sideSlugCached(m, "away");
+    if (hs === p.teamA && as === p.teamB) return { gA: m.hg, gB: m.ag };
+    if (hs === p.teamB && as === p.teamA) return { gA: m.ag, gB: m.hg };
+  }
+  return null;
+}
+import { sideSlug } from "./slugs.mjs";
+const slugCache = new Map();
+function sideSlugCached(m, side) {
+  const k = m.id + side;
+  if (!slugCache.has(k)) slugCache.set(k, sideSlug(m, side));
+  return slugCache.get(k);
+}
+
+function scorePick(p, r) {
+  if (!r) return null;
+  const actual = r.gA > r.gB ? "a" : r.gA < r.gB ? "b" : "draw";
+  let pts = p.pick === actual ? 2 : 0;
+  if (p.scoreA != null && p.scoreA === r.gA && p.scoreB === r.gB) pts += 3;
+  return { pts, actual: `${r.gA}-${r.gB}` };
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   try {
@@ -177,6 +211,43 @@ const server = createServer(async (req, res) => {
       const lm = liveModel(f.lambda, f.mu, live.homeScore, live.awayScore, mins);
       const signal = buildSignal(live, lm, pre, q.get("a"), q.get("b"));
       json(res, 200, { live, model: lm, signal, pre: { winA: f.winA, draw: f.draw, winB: f.winB } });
+    } else if (url.pathname === "/api/family" && req.method === "GET") {
+      const a = url.searchParams.get("a"), b = url.searchParams.get("b");
+      const picks = loadFamily();
+      const board = {};
+      const enriched = picks.map(p => {
+        const sc = scorePick(p, resultForPick(p));
+        board[p.name] ??= { name: p.name, pts: 0, picks: 0, scored: 0 };
+        board[p.name].picks++;
+        if (sc) { board[p.name].pts += sc.pts; board[p.name].scored++; }
+        return { ...p, result: sc?.actual ?? null, pts: sc?.pts ?? null };
+      });
+      const forMatch = enriched.filter(p =>
+        (p.teamA === a && p.teamB === b) || (p.teamA === b && p.teamB === a)).reverse();
+      json(res, 200, {
+        forMatch,
+        all: enriched.slice(-60).reverse(),
+        leaderboard: Object.values(board).sort((x, y) => y.pts - x.pts),
+      });
+    } else if (url.pathname === "/api/family" && req.method === "POST") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      const b = JSON.parse(body);
+      const name = String(b.name ?? "").trim().slice(0, 24);
+      if (!name) return json(res, 400, { error: "name required" });
+      if (!["a", "draw", "b"].includes(b.pick)) return json(res, 400, { error: "bad pick" });
+      if (ratings[b.teamA] == null || ratings[b.teamB] == null) return json(res, 400, { error: "bad teams" });
+      const picks = loadFamily();
+      // one pick per person per match — latest overwrites
+      const filtered = picks.filter(p => !(p.name.toLowerCase() === name.toLowerCase() && p.teamA === b.teamA && p.teamB === b.teamB));
+      filtered.push({
+        name, teamA: b.teamA, teamB: b.teamB, pick: b.pick,
+        scoreA: Number.isInteger(b.scoreA) ? b.scoreA : null,
+        scoreB: Number.isInteger(b.scoreB) ? b.scoreB : null,
+        date: new Date().toISOString(),
+      });
+      saveFamily(filtered);
+      json(res, 200, { saved: true });
     } else if (url.pathname === "/api/refresh" && req.method === "POST") {
       refreshData();
       json(res, 200, { started: true, lastRefresh });

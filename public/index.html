@@ -240,6 +240,17 @@
   .liveProbs .lp .v { font-size: 16px; font-weight: 800; }
   .liveProbs .lp .d { font-size: 10px; color: var(--dim); }
   .liveProbs .lp .delta { font-size: 10px; font-weight: 700; }
+  /* family game */
+  .famCard { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .famRow { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .famSeg { flex: 1; min-width: 220px; }
+  .famSeg button { font-size: 11.5px; padding: 7px 4px; }
+  .famPickRow { display: flex; gap: 8px; font-size: 12px; padding: 4px 2px; border-bottom: 1px dashed #1a2636; align-items: baseline; }
+  .famPickRow .nm { font-weight: 700; color: var(--gold); }
+  .famPickRow .pts { margin-left: auto; font-weight: 800; }
+  .famBoardRow { display: flex; gap: 8px; font-size: 12px; padding: 3px 2px; }
+  .famBoardRow .rank { width: 18px; color: var(--dim); }
+  .famBoardRow .pts { margin-left: auto; font-weight: 800; color: var(--accent); }
   .toast { position: fixed; bottom: 22px; right: 22px; background: var(--accent); color: #06281c; padding: 10px 18px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9; }
   .toast.show { opacity: 1; }
   .toast.err { background: var(--red); color: #2b0707; }
@@ -335,6 +346,25 @@
       <label>Notes / reasoning (saved with prediction)</label>
       <textarea id="reasoning" rows="2" placeholder="Why this setup — injuries, style matchup, form…"></textarea>
       <button class="saveBtn" id="saveBtn">Save prediction</button>
+
+      <div class="famCard">
+        <h2 style="text-align:center">👨‍👩‍👧 Family game — call it!</h2>
+        <div class="famRow">
+          <input type="text" id="famName" placeholder="your name" maxlength="24" style="width:130px">
+          <div class="seg famSeg" id="famSeg">
+            <button data-fp="a" id="famBtnA">Team A</button>
+            <button data-fp="draw">Draw</button>
+            <button data-fp="b" id="famBtnB">Team B</button>
+          </div>
+        </div>
+        <div class="famRow">
+          <span class="sub">exact score (optional, +3 pts):</span>
+          <input type="number" id="famSA" min="0" class="actualIn"> – <input type="number" id="famSB" min="0" class="actualIn">
+          <button class="btn" id="famSave" style="margin-left:auto">🔒 Lock it in</button>
+        </div>
+        <div id="famPicks"></div>
+        <div id="famBoard"></div>
+      </div>
     </div>
 
     <!-- TEAM B -->
@@ -1168,6 +1198,48 @@ function toggleSlip(cell) {
   renderSlip();
 }
 
+/* ---------- family game ---------- */
+let famPick = null;
+
+function famPickLabel(p, a, b) {
+  return p.pick === "a" ? cap(p.teamA) : p.pick === "b" ? cap(p.teamB) : "Draw";
+}
+
+async function loadFamily() {
+  const a = $("teamA").value, b = $("teamB").value;
+  $("famBtnA").textContent = cap(a);
+  $("famBtnB").textContent = cap(b);
+  const d = await (await fetch(`/api/family?a=${a}&b=${b}`)).json();
+  $("famPicks").innerHTML = d.forMatch.length
+    ? `<label>picks for this match</label>` + d.forMatch.map(p => `
+      <div class="famPickRow"><span class="nm">${p.name}</span>
+        <span>${famPickLabel(p)}${p.scoreA != null ? ` (${p.scoreA}-${p.scoreB})` : ""}</span>
+        <span class="pts">${p.result ? (p.pts > 0 ? "✓ +" + p.pts : "✗ 0") + " · FT " + p.result : "⏳"}</span></div>`).join("")
+    : "";
+  $("famBoard").innerHTML = d.leaderboard.length
+    ? `<label>leaderboard</label>` + d.leaderboard.slice(0, 10).map((r, i) => `
+      <div class="famBoardRow"><span class="rank">${i + 1}.</span><span>${r.name}</span>
+        <span style="color:var(--dim)">${r.scored}/${r.picks} scored</span><span class="pts">${r.pts} pts</span></div>`).join("")
+    : "";
+}
+
+async function saveFamilyPick() {
+  const name = $("famName").value.trim();
+  if (!name) return toast("Put your name in first", true);
+  if (!famPick) return toast("Pick a result first", true);
+  localStorage.setItem("wc26_famname", name);
+  const sa = $("famSA").value, sb = $("famSB").value;
+  const res = await (await fetch("/api/family", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name, teamA: $("teamA").value, teamB: $("teamB").value, pick: famPick,
+      scoreA: sa === "" ? null : parseInt(sa, 10), scoreB: sb === "" ? null : parseInt(sb, 10),
+    }),
+  })).json();
+  toast(res.saved ? `Locked in, ${name} 🔒` : "Error: " + res.error, !res.saved);
+  loadFamily();
+}
+
 function toast(msg, isErr = false) {
   const t = $("toast");
   t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
@@ -1189,8 +1261,17 @@ async function init() {
     const side = id === "teamA" ? "A" : "B";
     renderPitch(side);
     loadPool(side).then(() => autoXI(side, true)); // AI-predicted XI fills automatically
-    refresh(); loadIntel();
+    refresh(); loadIntel(); loadFamily();
   });
+  $("famName").value = localStorage.getItem("wc26_famname") ?? "";
+  for (const btn of $("famSeg").children) {
+    btn.addEventListener("click", () => {
+      famPick = btn.dataset.fp;
+      for (const x of $("famSeg").children) x.classList.toggle("on", x === btn);
+    });
+  }
+  $("famSave").addEventListener("click", saveFamilyPick);
+  loadFamily();
   $("venue").addEventListener("change", refresh);
   $("formationA").addEventListener("change", () => renderPitch("A"));
   $("formationB").addEventListener("change", () => renderPitch("B"));
