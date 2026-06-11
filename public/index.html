@@ -190,6 +190,27 @@
   .oddsTable td.num { text-align: right; }
   .oddsTable .fav { color: var(--accent); font-weight: 700; }
   .stagePill { font-size: 10px; background: #0a1018; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--dim); }
+  .oddsPick { cursor: pointer; border-radius: 5px; transition: background .15s; }
+  .oddsPick:hover { background: #1d2a3c; outline: 1px solid var(--accent); }
+  .oddsPick.inSlip { background: #10b98126; outline: 1px solid var(--accent); font-weight: 700; }
+
+  /* bet calculator */
+  .slipGrid { display: grid; grid-template-columns: 1fr 290px; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .slipGrid { grid-template-columns: 1fr; } }
+  .slipRow { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-bottom: 1px dashed #1a2636; font-size: 12.5px; }
+  .slipRow .pick { color: var(--accent); font-weight: 700; }
+  .slipRow .odd { margin-left: auto; color: var(--gold); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .slipRow .rm { color: var(--red); cursor: pointer; font-weight: 700; padding: 0 4px; }
+  .slipSummary { background: #0a1018; border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .slipSummary .row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; }
+  .slipSummary .row .v { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .slipSummary .ret { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 10px; }
+  .slipSummary .ret .v { color: var(--accent); font-size: 18px; }
+  .stakeIn { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .stakeIn input { width: 110px; text-align: right; font-size: 15px; font-weight: 700; }
+  .quickStake { display: flex; gap: 5px; }
+  .quickStake button { background: #131a26; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 11.5px; }
+  .quickStake button:hover { color: var(--text); border-color: var(--accent); }
 
   /* live panel */
   #livePanel { margin-top: 14px; display: none; border-color: #7f1d1d; }
@@ -283,9 +304,8 @@
     <div class="card">
       <h2>Team A</h2>
       <select id="teamA"></select>
-      <label>Tactical approach</label>
-      <div class="seg" id="segA"></div>
-      <div class="styleName" id="styleNameA">BALANCED</div>
+      <label>Team DNA — how they actually play (detected from results)</label>
+      <div class="styleName" id="styleNameA">—</div>
       <label>Formation</label>
       <select id="formationA">
         <option>4-3-3</option><option>4-2-3-1</option><option>4-4-2</option><option>4-1-4-1</option>
@@ -320,9 +340,8 @@
     <div class="card">
       <h2>Team B</h2>
       <select id="teamB"></select>
-      <label>Tactical approach</label>
-      <div class="seg" id="segB"></div>
-      <div class="styleName" id="styleNameB">BALANCED</div>
+      <label>Team DNA — how they actually play (detected from results)</label>
+      <div class="styleName" id="styleNameB">—</div>
       <label>Formation</label>
       <select id="formationB">
         <option>4-3-3</option><option>4-2-3-1</option><option>4-4-2</option><option>4-1-4-1</option>
@@ -374,6 +393,27 @@
 
   <!-- ODDS TAB -->
   <div id="tab-odds" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <h2>🧾 Bet calculator — click any market odds in the table to build a slip</h2>
+      <div class="slipGrid">
+        <div id="slipRows"><div class="empty">No selections yet. Click odds below to add them.</div></div>
+        <div class="slipSummary">
+          <div class="stakeIn">
+            <span class="sub">Stake €</span>
+            <input type="number" id="stake" value="10" min="0" step="1">
+            <div class="quickStake">
+              <button data-st="5">5</button><button data-st="10">10</button><button data-st="25">25</button><button data-st="50">50</button>
+            </div>
+          </div>
+          <div class="row"><span>selections</span><span class="v" id="slipCount">0</span></div>
+          <div class="row"><span>combined odds</span><span class="v" id="slipOdds">—</span></div>
+          <div class="row"><span>model probability</span><span class="v" id="slipProb">—</span></div>
+          <div class="row ret"><span>potential return</span><span class="v" id="slipReturn">€0.00</span></div>
+          <div class="row"><span>profit</span><span class="v" id="slipProfit">€0.00</span></div>
+          <div class="row" style="margin-top:6px"><button class="btn" id="clearSlip" style="width:100%">clear slip</button></div>
+        </div>
+      </div>
+    </div>
     <div class="card">
       <h2>All 104 matches — model vs bookmaker consensus <span style="text-transform:none;letter-spacing:0" id="oddsMeta"></span></h2>
       <div style="overflow-x:auto"><table class="oddsTable" id="oddsTable"><thead>
@@ -573,34 +613,10 @@ function restoreLineup(side) {
 }
 
 /* ---------- style segments ---------- */
-function buildSeg(side) {
-  const seg = $("seg" + side);
-  seg.innerHTML = "";
-  for (const v of ["auto", "-2", "-1", "0", "1", "2"]) {
-    const b = document.createElement("button");
-    b.textContent = STYLE_ICONS[v];
-    b.title = v === "auto" ? "Auto — detected from real results" : STYLE_NAMES[v] + " (what-if override)";
-    b.dataset.v = v;
-    if (v === String(styles[side])) b.classList.add("on");
-    b.addEventListener("click", () => {
-      styles[side] = v === "auto" ? "auto" : parseInt(v, 10);
-      for (const x of seg.children) x.classList.toggle("on", x === b);
-      refresh();
-    });
-    seg.appendChild(b);
-  }
-}
-
-// styleName line under the segments: detected DNA in auto, override name otherwise
 function describeStyle(side, dna) {
-  const el = $("styleName" + side);
-  if (styles[side] === "auto") {
-    const fmt = (x) => (x >= 1 ? "+" : "") + ((x - 1) * 100).toFixed(0) + "%";
-    el.innerHTML = `🧬 ${dna.label.toUpperCase()}<br>` +
-      `<span style="color:var(--dim)">scores ${fmt(dna.attack)} · concedes ${fmt(dna.leak)} vs Elo exp. (${dna.n} games)</span>`;
-  } else {
-    el.textContent = STYLE_NAMES[styles[side]] + " (override)";
-  }
+  const fmt = (x) => (x >= 1 ? "+" : "") + ((x - 1) * 100).toFixed(0) + "%";
+  $("styleName" + side).innerHTML = `🧬 ${dna.label.toUpperCase()}<br>` +
+    `<span style="color:var(--dim)">scores ${fmt(dna.attack)} · concedes ${fmt(dna.leak)} vs Elo exp. (${dna.n} games)</span>`;
 }
 
 /* ---------- prediction ---------- */
@@ -1105,17 +1121,62 @@ async function loadOdds() {
     const valueCell = m.value
       ? `<td><span style="color:var(--accent);font-weight:700" title="model gives ${m.value.team} ${(m.value.edge * 100).toFixed(0)}pts more than the market">💎 ${m.value.side} @ ${m.value.odds?.toFixed(2) ?? "?"}</span></td>`
       : `<td style="color:var(--dim)">—</td>`;
+    const matchLabel = `${m.homeName} v ${m.awayName}`;
+    const pk = (sideLabel, pickName, odds, prob) => odds == null
+      ? `<td class="num">—</td>`
+      : `<td class="num oddsPick${slip.some(s => s.key === m.event + "|" + sideLabel) ? " inSlip" : ""}"
+           data-key="${m.event}|${sideLabel}" data-match="${matchLabel}" data-pick="${pickName}" data-odds="${odds}" data-prob="${prob}"
+           title="add ${pickName} @ ${odds.toFixed(2)} to slip">${odds.toFixed(2)}</td>`;
     return `<tr>
       <td>${m.start.slice(5, 10)}</td>
-      <td>${m.homeName} v ${m.awayName}</td>
+      <td>${matchLabel}</td>
       ${c(f.winA)}${c(f.draw)}${c(f.winB)}
       <td class="num">${f.fairA.toFixed(2)}</td><td class="num">${f.fairD.toFixed(2)}</td><td class="num">${f.fairB.toFixed(2)}</td>
-      ${o(mk?.odds?.home)}${o(mk?.odds?.draw)}${o(mk?.odds?.away)}
+      ${pk("1", m.homeName, mk?.odds?.home, f.winA)}${pk("X", "Draw", mk?.odds?.draw, f.draw)}${pk("2", m.awayName, mk?.odds?.away, f.winB)}
       <td class="num">${(f.over25 * 100).toFixed(0)}%${mk?.odds?.over25 ? " / " + mk.odds.over25.toFixed(2) : ""}</td>
       <td>${f.topScore.score} (${(f.topScore.p * 100).toFixed(0)}%)</td>
       ${valueCell}
       <td>${score}</td></tr>`;
   }).join("");
+}
+
+/* ---------- bet calculator ---------- */
+let slip = []; // {key, match, pick, odds, prob}
+
+function renderSlip() {
+  $("slipRows").innerHTML = slip.length
+    ? slip.map(s => `
+      <div class="slipRow">
+        <span>${s.match}</span><span class="pick">${s.pick}</span>
+        <span class="odd">${s.odds.toFixed(2)}</span>
+        <span class="rm" data-rm="${s.key}" title="remove">✕</span>
+      </div>`).join("")
+    : `<div class="empty">No selections yet. Click odds below to add them.</div>`;
+  const stake = parseFloat($("stake").value) || 0;
+  const combined = slip.reduce((p, s) => p * s.odds, 1);
+  const modelP = slip.reduce((p, s) => p * s.prob, 1);
+  $("slipCount").textContent = slip.length;
+  $("slipOdds").textContent = slip.length ? combined.toFixed(2) : "—";
+  $("slipProb").textContent = slip.length ? (modelP * 100).toFixed(1) + "%" : "—";
+  $("slipReturn").textContent = "€" + (slip.length ? stake * combined : 0).toFixed(2);
+  $("slipProfit").textContent = "€" + (slip.length ? stake * combined - stake : 0).toFixed(2);
+  // sync highlight on table cells
+  for (const cell of document.querySelectorAll(".oddsPick")) {
+    cell.classList.toggle("inSlip", slip.some(s => s.key === cell.dataset.key));
+  }
+}
+
+function toggleSlip(cell) {
+  const key = cell.dataset.key;
+  const i = slip.findIndex(s => s.key === key);
+  if (i >= 0) slip.splice(i, 1);
+  else {
+    // one pick per match: replace existing selection on the same event
+    const ev = key.split("|")[0];
+    slip = slip.filter(s => s.key.split("|")[0] !== ev);
+    slip.push({ key, match: cell.dataset.match, pick: cell.dataset.pick, odds: +cell.dataset.odds, prob: +cell.dataset.prob });
+  }
+  renderSlip();
 }
 
 function toast(msg, isErr = false) {
@@ -1131,7 +1192,6 @@ async function init() {
     sel.innerHTML = teams.map(t => `<option value="${t.name}">${cap(t.name)} (${t.elo})</option>`).join("");
   }
   $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "";
-  buildSeg("A"); buildSeg("B");
   restoreLineup("A"); restoreLineup("B");
   await Promise.all([loadPool("A"), loadPool("B")]);
   bindHover("A"); bindHover("B");
@@ -1156,6 +1216,13 @@ async function init() {
   for (const b of document.querySelectorAll(".tabbar button")) b.addEventListener("click", () => switchTab(b.dataset.tab));
   $("modelPicks").addEventListener("click", modelPicksAll);
   $("resetBracket").addEventListener("click", resetBracket);
+  $("oddsTable").addEventListener("click", (e) => { const c = e.target.closest(".oddsPick"); if (c) toggleSlip(c); });
+  $("slipRows").addEventListener("click", (e) => {
+    if (e.target.dataset?.rm) { slip = slip.filter(s => s.key !== e.target.dataset.rm); renderSlip(); }
+  });
+  $("stake").addEventListener("input", renderSlip);
+  $("clearSlip").addEventListener("click", () => { slip = []; renderSlip(); });
+  for (const b of document.querySelectorAll(".quickStake button")) b.addEventListener("click", () => { $("stake").value = b.dataset.st; renderSlip(); });
   $("log").addEventListener("click", (e) => { if (e.target.dataset?.file) setActual(e.target.dataset.file); });
   refresh(); loadIntel(); loadLog(); loadMatches();
 }
