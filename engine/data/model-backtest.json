@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-05-29T17:50:03.706Z",
+  "method": "Walk-forward out-of-sample: each match predicted from ratings built only on prior matches; Elo updated after. Burn-in skipped.",
+  "totalMatches": 920,
+  "evaluated": 770,
+  "burnIn": 150,
+  "dateFrom": "2023-10-12",
+  "dateTo": "2026-05-28",
+  "outcomeSplit": {
+    "home": 0.4857,
+    "draw": 0.2195,
+    "away": 0.2948
+  },
+  "model": {
+    "accuracy": 0.6104,
+    "brier": 0.5348,
+    "logloss": 0.9133,
+    "favouriteAccuracy": 0.668,
+    "favouriteCount": 515
+  },
+  "baselines": {
+    "alwaysHome": 0.4857,
+    "eloPickNoDraw": 0.6026,
+    "uniformBrier": 0.6667,
+    "uniformLogloss": 1.0986
+  }
+}

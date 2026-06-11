@@ -313,8 +313,9 @@
       </select>
       <div class="pitch" id="pitchA"></div>
       <div class="loadRow">
-        <button class="btn" id="autoA">⭐ Auto XI</button>
+        <button class="btn" id="autoA">⭐ Predicted XI</button>
         <button class="btn" id="loadA">📋 Confirmed XI</button>
+        <button class="btn" id="clearA" title="empty all slots">🧹</button>
       </div>
       <datalist id="dlA"></datalist>
     </div>
@@ -349,8 +350,9 @@
       </select>
       <div class="pitch" id="pitchB"></div>
       <div class="loadRow">
-        <button class="btn" id="autoB">⭐ Auto XI</button>
+        <button class="btn" id="autoB">⭐ Predicted XI</button>
         <button class="btn" id="loadB">📋 Confirmed XI</button>
+        <button class="btn" id="clearB" title="empty all slots">🧹</button>
       </div>
       <datalist id="dlB"></datalist>
     </div>
@@ -508,7 +510,7 @@ const SLOT_FITS = {
   CM: ["CM", "CDM", "CAM"], LM: ["LM", "LW", "CM"], RM: ["RM", "RW", "CM"],
   LW: ["LW", "LM", "CF", "ST"], RW: ["RW", "RM", "CF", "ST"], ST: ["ST", "CF", "LW", "RW"],
 };
-function autoXI(side) {
+function autoXI(side, quiet = false) {
   const chips = [...$("pitch" + side).querySelectorAll(".chip")];
   const used = new Set();
   const picks = new Array(chips.length).fill(null);
@@ -530,7 +532,7 @@ function autoXI(side) {
   });
   setPlayers(side, picks.map(p => p?.name ?? ""));
   refreshBadges(side);
-  toast(`Best XI picked for ${cap($("team" + side).value)} (FC26 ratings)`);
+  if (!quiet) toast(`Predicted XI for ${cap($("team" + side).value)} (best rated, in position)`);
 }
 
 /* ---------- pitch ---------- */
@@ -581,7 +583,6 @@ function renderPitch(side) {
     pitch.appendChild(div);
   });
   for (const inp of pitch.querySelectorAll("input")) {
-    inp.addEventListener("change", () => { persistLineup(side); refreshBadges(side); });
     inp.addEventListener("input", () => refreshBadges(side));
   }
   refreshBadges(side);
@@ -593,23 +594,7 @@ function getPlayers(side) {
 function setPlayers(side, names) {
   const inputs = [...$("pitch" + side).querySelectorAll("input")];
   inputs.forEach((inp, i) => inp.value = names[i] ?? "");
-  persistLineup(side);
   refreshBadges(side);
-}
-function persistLineup(side) {
-  const team = $("team" + side).value;
-  localStorage.setItem("wc26_" + team, JSON.stringify({ formation: $("formation" + side).value, players: getPlayers(side) }));
-}
-function restoreLineup(side) {
-  const saved = localStorage.getItem("wc26_" + $("team" + side).value);
-  if (saved) {
-    const { formation, players } = JSON.parse(saved);
-    $("formation" + side).value = formation;
-    renderPitch(side);
-    setPlayers(side, players);
-  } else {
-    renderPitch(side);
-  }
 }
 
 /* ---------- style segments ---------- */
@@ -630,7 +615,7 @@ async function refresh() {
   const f = d.adjusted ?? d.baseline;
   describeStyle("A", d.dnaA); describeStyle("B", d.dnaB);
   const styleTxt = (s, dna) => s === "auto" ? dna.label : STYLE_NAMES[s].toLowerCase();
-  $("title").innerHTML = `${cap(d.teamA)} <span class="elo">${d.eloA}</span> &nbsp;v&nbsp; ${cap(d.teamB)} <span class="elo">${d.eloB}</span>` +
+  $("title").innerHTML = `${cap(d.teamA)} &nbsp;v&nbsp; ${cap(d.teamB)}` +
     `<div class="elo">${d.home ? cap(d.home) + " at home" : "neutral venue"} · ${styleTxt(styles.A, d.dnaA)} v ${styleTxt(styles.B, d.dnaB)}</div>`;
   const rows = [
     ["winA", cap(d.teamA), f.winA, d.baseline.winA],
@@ -716,6 +701,11 @@ function applyMatch(m) {
   $("venue").value = HOSTS.has(m.homeSlug) ? "A" : HOSTS.has(m.awaySlug) ? "B" : "";
   $("matchInfo").textContent = new Date(m.start).toLocaleString() + (HOSTS.has(m.homeSlug) || HOSTS.has(m.awaySlug) ? " · host nation playing" : " · neutral");
   refresh(); loadIntel();
+  // near kickoff (or in play): swap predicted XIs for the confirmed ones automatically
+  const minsToKO = (new Date(m.start) - Date.now()) / 60000;
+  if (m.status !== "not_started" || (minsToKO < 80 && minsToKO > -120)) {
+    setTimeout(() => { loadXI("A", true); loadXI("B", true); }, 2000);
+  }
 }
 
 // Sportradar names ("Lionel Messi") → FC26 pool names ("L. Messi") so badges/cards work
@@ -730,14 +720,14 @@ function matchToPool(side, fullName) {
   return byInitial?.name ?? fullName;
 }
 
-async function loadXI(side) {
-  if (!currentEvent) return toast("Pick a match from the Fixtures list first", true);
+async function loadXI(side, quiet = false) {
+  if (!currentEvent) return quiet || toast("Pick a match from the Fixtures list first", true);
   const d = await (await fetch(`/api/lineups?event=${currentEvent}`)).json();
-  if (d.error) return toast(d.error, true);
+  if (d.error) return quiet || toast(d.error, true);
   const want = $("team" + side).value;
   const t = d.find(x => x.slug === want);
-  if (!t) return toast(`${cap(want)} is not in this fixture`, true);
-  if (!t.starters.length) return toast("Lineups not published yet (~1h before kickoff)", true);
+  if (!t) return quiet || toast(`${cap(want)} is not in this fixture`, true);
+  if (!t.starters.length) return quiet || toast("Lineups not published yet (~1h before kickoff)", true);
   if (t.formation) {
     const sel = $("formation" + side);
     if (![...sel.options].some(o => o.value === t.formation)) sel.add(new Option(t.formation, t.formation));
@@ -958,7 +948,6 @@ function renderGroups() {
         <div class="gRow ${i < 2 ? "q" + (i + 1) : i === 2 ? "q3" : ""}" data-g="${g}" data-i="${i}">
           <span class="pos">${i + 1}</span><span>${cap(s)}</span>
           ${i === 2 ? `<input type="checkbox" data-third="${g}" ${thirds.has(g) ? "checked" : ""} title="advances as third">` : ""}
-          <span class="elo">${eloMap[s] ?? ""}</span>
         </div>`).join("")}
     </div>`).join("");
   $("thirdsCount").textContent = `thirds selected: ${thirds.size}/8`;
@@ -1189,24 +1178,29 @@ function toast(msg, isErr = false) {
 async function init() {
   const teams = await (await fetch("/api/teams")).json();
   for (const sel of [$("teamA"), $("teamB")]) {
-    sel.innerHTML = teams.map(t => `<option value="${t.name}">${cap(t.name)} (${t.elo})</option>`).join("");
+    sel.innerHTML = teams.map(t => `<option value="${t.name}">${cap(t.name)}</option>`).join("");
   }
   $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "";
-  restoreLineup("A"); restoreLineup("B");
+  renderPitch("A"); renderPitch("B");
   await Promise.all([loadPool("A"), loadPool("B")]);
+  autoXI("A", true); autoXI("B", true);
   bindHover("A"); bindHover("B");
   for (const id of ["teamA", "teamB"]) $(id).addEventListener("change", () => {
     const side = id === "teamA" ? "A" : "B";
-    restoreLineup(side); loadPool(side); refresh(); loadIntel();
+    renderPitch(side);
+    loadPool(side).then(() => autoXI(side, true)); // AI-predicted XI fills automatically
+    refresh(); loadIntel();
   });
   $("venue").addEventListener("change", refresh);
-  $("formationA").addEventListener("change", () => { renderPitch("A"); persistLineup("A"); });
-  $("formationB").addEventListener("change", () => { renderPitch("B"); persistLineup("B"); });
+  $("formationA").addEventListener("change", () => renderPitch("A"));
+  $("formationB").addEventListener("change", () => renderPitch("B"));
   $("saveBtn").addEventListener("click", savePrediction);
   $("loadA").addEventListener("click", () => loadXI("A"));
   $("loadB").addEventListener("click", () => loadXI("B"));
   $("autoA").addEventListener("click", () => autoXI("A"));
   $("autoB").addEventListener("click", () => autoXI("B"));
+  $("clearA").addEventListener("click", () => setPlayers("A", []));
+  $("clearB").addEventListener("click", () => setPlayers("B", []));
   $("matchPicker").addEventListener("change", () => {
     const m = matches[$("matchPicker").value];
     if (m) applyMatch(m);

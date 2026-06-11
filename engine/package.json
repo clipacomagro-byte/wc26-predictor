@@ -1,0 +1,18 @@
+{
+  "name": "world-cup-2026-prediction-model",
+  "version": "1.0.0",
+  "description": "Open-source statistical model (Elo + Dixon-Coles bivariate Poisson + Monte Carlo) for the 2026 FIFA World Cup. Powers the live predictions at cup26matches.com.",
+  "type": "module",
+  "scripts": {
+    "calibrate": "node calibrate.mjs",
+    "backtest": "node backtest.mjs",
+    "predict": "node predict.mjs"
+  },
+  "keywords": [
+    "world-cup-2026", "fifa", "football", "soccer", "predictions", "elo",
+    "dixon-coles", "poisson", "monte-carlo", "sports-analytics", "statistics"
+  ],
+  "homepage": "https://cup26matches.com",
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}
