@@ -7,7 +7,8 @@ import { ratings, predictFromLambdas, clampAdjust, baseLambdas, manualStyle, com
 import { intel } from "./form.mjs";
 import { teamDna } from "./teamdna.mjs";
 import { api, cache } from "./apifb.mjs";
-import { schedule, lineups as srLineups, timeline } from "./sportradar.mjs";
+import { schedule, lineups as srLineups, timeline, bracket } from "./sportradar.mjs";
+import { expectedScore } from "../engine/elo.mjs";
 import { poissonPmf } from "../engine/elo.mjs";
 
 // Live in-play model: pre-match expected goals scaled to the time remaining,
@@ -94,11 +95,17 @@ function computePrediction(q) {
   // corners heuristic wants a -2..2 "approach" — derive it from the attack multiplier
   const pseudo = (st) => Math.max(-2, Math.min(2, Math.round((st.attack - 1) / 0.05)));
   const corners = cornersEstimate(f.lambda, f.mu, pseudo(styleObjA), pseudo(styleObjB));
+  // knockout win prob: draws go to extra time/penalties — approximate the
+  // shootout with Elo expectancy, like the engine's sampleMatch does
+  const eloExp = expectedScore(base.ra, base.rb, base.hb);
+  const koWinA = f.winA + f.draw * eloExp;
   return {
     teamA, teamB, home, eloA: base.ra, eloB: base.rb,
-    styleA: sa, styleB: sb, dnaA, dnaB, mA, mB, baseline, adjusted, corners,
+    styleA: sa, styleB: sb, dnaA, dnaB, mA, mB, baseline, adjusted, corners, koWinA,
   };
 }
+
+const HOST_NATIONS = new Set(["usa", "mexico", "canada"]);
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -134,6 +141,27 @@ const server = createServer(async (req, res) => {
       const lm = liveModel(f.lambda, f.mu, live.homeScore, live.awayScore, mins);
       const signal = buildSignal(live, lm, pre, q.get("a"), q.get("b"));
       json(res, 200, { live, model: lm, signal, pre: { winA: f.winA, draw: f.draw, winB: f.winB } });
+    } else if (url.pathname === "/api/bracket") {
+      json(res, 200, await bracket());
+    } else if (url.pathname === "/api/oddsboard") {
+      // model probabilities + fair odds for every match with known teams
+      const sched = await schedule();
+      json(res, 200, sched.map(m => {
+        if (ratings[m.homeSlug] == null || ratings[m.awaySlug] == null) {
+          return { ...m, model: null };
+        }
+        const home = HOST_NATIONS.has(m.homeSlug) ? m.homeSlug : HOST_NATIONS.has(m.awaySlug) ? m.awaySlug : "";
+        const p = computePrediction(new URLSearchParams({ a: m.homeSlug, b: m.awaySlug, home }));
+        const f = p.adjusted ?? p.baseline;
+        return {
+          ...m,
+          model: {
+            winA: f.winA, draw: f.draw, winB: f.winB, over25: f.over25,
+            fairA: 1 / f.winA, fairD: 1 / f.draw, fairB: 1 / f.winB,
+            topScore: f.topScorelines[0],
+          },
+        };
+      }));
     } else if (url.pathname === "/api/matches") {
       json(res, 200, await schedule({ force: url.searchParams.get("force") === "1" }));
     } else if (url.pathname === "/api/lineups") {

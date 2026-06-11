@@ -53,6 +53,34 @@ export async function schedule({ force = false } = {}) {
   });
 }
 
+// Tournament structure from the cached schedule: 12 real groups + the official
+// knockout tree with FIFA placeholder slots ("1A", "2B", "3A/3B/3C/3D/3F", "W73", "RU101").
+export async function bracket() {
+  await schedule(); // ensure cache exists/fresh
+  const raw = JSON.parse(readFileSync(SCHEDULE_CACHE, "utf8"));
+  const groups = {};
+  const knockout = [];
+  for (const s of raw.schedules) {
+    const ctx = s.sport_event.sport_event_context;
+    if (ctx?.stage?.type === "league") {
+      const gname = ctx.groups?.[0]?.name?.split("Group ")[1];
+      if (!gname) continue;
+      groups[gname] ??= new Set();
+      for (const c of s.sport_event.competitors ?? []) groups[gname].add(slugForName(c.name));
+    } else if (ctx?.stage?.type === "cup") {
+      knockout.push({
+        n: ctx.round.competition_sport_event_number,
+        round: ctx.round.name,
+        date: s.sport_event.start_time.slice(0, 10),
+        event: s.sport_event.id,
+        slots: (s.sport_event.competitors ?? []).map(c => c.name), // e.g. "1A", "W73", "3A/3B/3C/3D/3F"
+      });
+    }
+  }
+  knockout.sort((a, b) => a.n - b.n);
+  return { groups: Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, [...v]])), knockout };
+}
+
 // Live match state: score, clock, key stats, event timeline. One API call.
 // Parsed defensively — exact stat keys vary by coverage level.
 export async function timeline(eventId) {

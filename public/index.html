@@ -149,6 +149,47 @@
   .actualIn { width: 32px; text-align: center; padding: 3px; }
   .okBtn { background: var(--line); border: none; color: var(--text); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
   .logCard { margin-top: 14px; }
+  /* tabs */
+  .tabbar { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tabbar button {
+    background: #0a1018; border: 1px solid var(--line); color: var(--dim); border-radius: 9px;
+    padding: 8px 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .5px;
+  }
+  .tabbar button.on { background: var(--accent); color: #06281c; border-color: var(--accent); }
+  .tabbar button:hover:not(.on) { color: var(--text); border-color: var(--accent); }
+
+  /* bracket */
+  .groupsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px; }
+  .groupCard { background: #0a1018; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .groupCard h3 { font-size: 12px; color: var(--gold); letter-spacing: 1.5px; margin-bottom: 6px; }
+  .gRow { display: flex; align-items: center; gap: 7px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; margin: 2px 0; }
+  .gRow:hover { background: #16202e; }
+  .gRow .pos { width: 14px; color: var(--dim); font-weight: 700; font-size: 11px; }
+  .gRow .elo { margin-left: auto; color: var(--dim); font-size: 10.5px; }
+  .gRow.q1, .gRow.q2 { background: #10b9811a; border-left: 2px solid var(--accent); }
+  .gRow.q3 { background: #fbbf2410; border-left: 2px solid var(--gold); }
+  .gRow input[type=checkbox] { accent-color: var(--gold); margin: 0; }
+  .koWrap { display: flex; gap: 12px; overflow-x: auto; padding: 14px 2px; align-items: stretch; }
+  .koCol { min-width: 215px; display: flex; flex-direction: column; gap: 8px; justify-content: space-around; }
+  .koCol h3 { font-size: 11px; color: var(--dim); letter-spacing: 1.5px; text-align: center; }
+  .koMatch { background: #0a1018; border: 1px solid var(--line); border-radius: 9px; padding: 6px; }
+  .koMatch .d { font-size: 9.5px; color: var(--dim); text-align: center; }
+  .koTeam { display: flex; align-items: center; gap: 6px; padding: 4px 7px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+  .koTeam:hover { background: #16202e; }
+  .koTeam.win { background: #10b98122; border-left: 2px solid var(--accent); font-weight: 700; }
+  .koTeam.tbd { color: var(--dim); cursor: default; font-style: italic; }
+  .koTeam .pc { margin-left: auto; font-size: 10.5px; color: var(--accent); }
+  .champ { text-align: center; padding: 16px; border: 1px solid #5a4a1e; border-radius: 12px;
+    background: linear-gradient(160deg, #2b2410, #100d06); margin-top: 4px; }
+  .champ .t { font-size: 12px; color: var(--gold); letter-spacing: 2px; }
+  .champ .n { font-size: 24px; font-weight: 900; }
+  .bracketBtns { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; align-items: center; }
+
+  /* odds board */
+  .oddsTable td.num { text-align: right; }
+  .oddsTable .fav { color: var(--accent); font-weight: 700; }
+  .stagePill { font-size: 10px; background: #0a1018; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--dim); }
+
   /* live panel */
   #livePanel { margin-top: 14px; display: none; border-color: #7f1d1d; }
   #livePanel.on { display: block; }
@@ -194,7 +235,13 @@
       </select>
     </span>
   </header>
-  <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <div class="tabbar">
+    <button class="on" data-tab="center">⚽ Match Center</button>
+    <button data-tab="bracket">🏆 Bracket Predictor</button>
+    <button data-tab="odds">📊 Odds Board</button>
+  </div>
+
+  <div class="card" id="fixturesBar" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <h2 style="margin:0">Fixtures</h2>
     <select id="matchPicker" style="flex:1;min-width:260px">
       <option value="">— pick a real World Cup match (Sportradar) —</option>
@@ -301,6 +348,37 @@
     <div style="overflow-x:auto"><table id="log"><thead>
       <tr><th>date</th><th>match</th><th>setup</th><th>model (1X2)</th><th>top score</th><th>corners est</th><th>actual</th><th>result</th></tr>
     </thead><tbody></tbody></table></div>
+  </div>
+
+  <!-- BRACKET TAB -->
+  <div id="tab-bracket" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <h2>Group stage — click a team to move it up · ☑ pick exactly 8 third-placed qualifiers</h2>
+      <div class="bracketBtns">
+        <button class="btn" id="modelPicks">🤖 Model picks everything</button>
+        <button class="btn" id="resetBracket">↺ Reset</button>
+        <span class="sub" id="thirdsCount"></span>
+      </div>
+      <div class="groupsGrid" id="groupsGrid"></div>
+    </div>
+    <div class="card">
+      <h2>Knockout — click a team to send them through (% = model knockout win chance, pens included)</h2>
+      <div class="koWrap" id="koWrap"></div>
+      <div class="champ" id="champCard" style="display:none">
+        <div class="t">🏆 YOUR WORLD CHAMPION</div>
+        <div class="n" id="champName"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ODDS TAB -->
+  <div id="tab-odds" style="display:none">
+    <div class="card">
+      <h2>All 104 matches — model probabilities &amp; fair odds <span style="text-transform:none;letter-spacing:0">(bookmaker columns light up when ODDS_API_KEY is set)</span></h2>
+      <div style="overflow-x:auto"><table class="oddsTable" id="oddsTable"><thead>
+        <tr><th>date</th><th>stage</th><th>match</th><th>1</th><th>X</th><th>2</th><th>fair 1</th><th>fair X</th><th>fair 2</th><th>o2.5</th><th>top score</th><th>result</th></tr>
+      </thead><tbody></tbody></table></div>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -816,6 +894,222 @@ const DEMO_LIVE = {
   },
 };
 
+/* ---------- tabs ---------- */
+const TAB_SECTIONS = { center: ["fixturesBar", "livePanel", null, null, null] };
+function switchTab(name) {
+  for (const b of document.querySelectorAll(".tabbar button")) b.classList.toggle("on", b.dataset.tab === name);
+  const centerEls = [$("fixturesBar"), $("livePanel"), document.querySelector(".layout"), document.querySelector(".intelGrid"), document.querySelector(".logCard")];
+  for (const el of centerEls) el.style.display = name === "center" ? "" : "none";
+  $("tab-bracket").style.display = name === "bracket" ? "" : "none";
+  $("tab-odds").style.display = name === "odds" ? "" : "none";
+  if (name === "bracket" && !bracketData) loadBracket();
+  if (name === "odds" && !oddsLoaded) loadOdds();
+}
+
+/* ---------- bracket predictor ---------- */
+let bracketData = null;
+let eloMap = {};
+let groupOrder = {};   // {A: [slug x4 ordered]}
+let thirds = new Set();
+let picks = {};        // {matchN: winnerSlug}
+const koProbCache = {};
+
+async function loadBracket() {
+  const d = await (await fetch("/api/bracket")).json();
+  if (d.error) return toast(d.error, true);
+  bracketData = d;
+  const teams = await (await fetch("/api/teams")).json();
+  eloMap = Object.fromEntries(teams.map(t => [t.name, t.elo]));
+  resetBracket();
+}
+
+function resetBracket() {
+  groupOrder = {};
+  for (const [g, slugs] of Object.entries(bracketData.groups)) {
+    groupOrder[g] = [...slugs].sort((a, b) => (eloMap[b] ?? 0) - (eloMap[a] ?? 0));
+  }
+  // default thirds: the 8 strongest third-placed teams
+  thirds = new Set(Object.keys(groupOrder).sort((a, b) => (eloMap[groupOrder[b][2]] ?? 0) - (eloMap[groupOrder[a][2]] ?? 0)).slice(0, 8));
+  picks = {};
+  renderGroups(); renderKO();
+}
+
+function renderGroups() {
+  $("groupsGrid").innerHTML = Object.keys(groupOrder).sort().map(g => `
+    <div class="groupCard"><h3>GROUP ${g}</h3>
+      ${groupOrder[g].map((s, i) => `
+        <div class="gRow ${i < 2 ? "q" + (i + 1) : i === 2 ? "q3" : ""}" data-g="${g}" data-i="${i}">
+          <span class="pos">${i + 1}</span><span>${cap(s)}</span>
+          ${i === 2 ? `<input type="checkbox" data-third="${g}" ${thirds.has(g) ? "checked" : ""} title="advances as third">` : ""}
+          <span class="elo">${eloMap[s] ?? ""}</span>
+        </div>`).join("")}
+    </div>`).join("");
+  $("thirdsCount").textContent = `thirds selected: ${thirds.size}/8`;
+  for (const row of document.querySelectorAll(".gRow")) {
+    row.addEventListener("click", (e) => {
+      if (e.target.dataset?.third !== undefined) return; // checkbox handles itself
+      const g = row.dataset.g, i = +row.dataset.i;
+      if (i === 0) return;
+      [groupOrder[g][i - 1], groupOrder[g][i]] = [groupOrder[g][i], groupOrder[g][i - 1]];
+      picks = {}; // group changes invalidate knockout picks
+      renderGroups(); renderKO();
+    });
+  }
+  for (const cb of document.querySelectorAll("[data-third]")) {
+    cb.addEventListener("change", () => {
+      cb.checked ? thirds.add(cb.dataset.third) : thirds.delete(cb.dataset.third);
+      picks = {};
+      renderGroups(); renderKO();
+    });
+  }
+}
+
+// assign the 8 selected third-place groups to the 8 constrained R32 slots (backtracking)
+function assignThirds() {
+  const slots = bracketData.knockout.filter(m => m.slots.some(s => s.includes("/")))
+    .map(m => ({ n: m.n, allowed: m.slots.find(s => s.includes("/")).split("/").map(x => x[1]) }));
+  if (thirds.size !== 8) return null;
+  const sel = [...thirds];
+  const assign = {};
+  const used = new Set();
+  function bt(i) {
+    if (i === slots.length) return true;
+    for (const g of slots[i].allowed) {
+      if (sel.includes(g) && !used.has(g)) {
+        used.add(g); assign[slots[i].n] = g;
+        if (bt(i + 1)) return true;
+        used.delete(g); delete assign[slots[i].n];
+      }
+    }
+    return false;
+  }
+  return bt(0) ? assign : null;
+}
+
+function resolveSlot(slot, thirdAssign, matchN) {
+  if (/^[12][A-L]$/.test(slot)) return groupOrder[slot[1]]?.[+slot[0] - 1] ?? null;
+  if (slot.includes("/")) return thirdAssign ? (groupOrder[thirdAssign[matchN]]?.[2] ?? null) : null;
+  if (/^W(\d+)$/.test(slot)) return picks[+slot.slice(1)] ?? null;
+  if (/^RU(\d+)$/.test(slot)) {
+    const n = +slot.slice(2);
+    const m = bracketData.knockout.find(x => x.n === n);
+    if (!picks[n] || !m) return null;
+    const a = resolvedTeams[n];
+    return a ? a.find(t => t !== picks[n]) ?? null : null;
+  }
+  return null;
+}
+
+let resolvedTeams = {}; // {matchN: [slugA, slugB]}
+
+async function koProb(a, b) {
+  const key = a + "|" + b;
+  if (koProbCache[key]) return koProbCache[key];
+  const HOSTS2 = ["usa", "mexico", "canada"];
+  const home = HOSTS2.includes(a) ? a : HOSTS2.includes(b) ? b : "";
+  const d = await (await fetch(`/api/predict?${new URLSearchParams({ a, b, home })}`)).json();
+  koProbCache[key] = d.koWinA;
+  return d.koWinA;
+}
+
+const ROUND_NAMES = { round_of_32: "ROUND OF 32", round_of_16: "ROUND OF 16", quarterfinal: "QUARTER-FINALS", semifinal: "SEMI-FINALS", "3rd_place_playoff": "3RD PLACE", final: "FINAL" };
+
+async function renderKO() {
+  const thirdAssign = assignThirds();
+  resolvedTeams = {};
+  const rounds = {};
+  for (const m of bracketData.knockout) {
+    (rounds[m.round] ??= []).push(m);
+    resolvedTeams[m.n] = m.slots.map(s => resolveSlot(s, thirdAssign, m.n));
+  }
+  const order = ["round_of_32", "round_of_16", "quarterfinal", "semifinal", "final", "3rd_place_playoff"];
+  $("koWrap").innerHTML = order.filter(r => rounds[r]).map(r => `
+    <div class="koCol"><h3>${ROUND_NAMES[r]}</h3>
+      ${rounds[r].map(m => `
+        <div class="koMatch" data-n="${m.n}"><div class="d">M${m.n} · ${m.date.slice(5)}</div>
+          ${m.slots.map((slot, si) => {
+            const t = resolvedTeams[m.n][si];
+            const isPick = t && picks[m.n] === t;
+            return t
+              ? `<div class="koTeam ${isPick ? "win" : ""}" data-n="${m.n}" data-t="${t}"><span>${cap(t)}</span><span class="pc" data-pc="${m.n}-${si}"></span></div>`
+              : `<div class="koTeam tbd">${slot.includes("/") ? "3rd: " + slot.replace(/3/g, "") : slot}</div>`;
+          }).join("")}
+        </div>`).join("")}
+    </div>`).join("");
+  if (thirds.size !== 8) $("koWrap").insertAdjacentHTML("afterbegin",
+    `<div class="empty" style="min-width:200px;align-self:center">Select exactly 8 thirds to unlock the bracket (${thirds.size}/8).</div>`);
+  for (const el of document.querySelectorAll(".koTeam[data-t]")) {
+    el.addEventListener("click", () => {
+      const n = +el.dataset.n;
+      picks[n] = el.dataset.t;
+      // clear downstream picks that referenced teams no longer advancing
+      for (const m of bracketData.knockout) {
+        if (picks[m.n] && m.n !== n) {
+          const teams = m.slots.map(s => resolveSlot(s, thirdAssign, m.n));
+          if (!teams.includes(picks[m.n])) delete picks[m.n];
+        }
+      }
+      renderKO();
+    });
+  }
+  // fill model %s for resolved pairings
+  for (const m of bracketData.knockout) {
+    const [a, b] = resolvedTeams[m.n];
+    if (a && b) {
+      koProb(a, b).then(p => {
+        const ea = document.querySelector(`[data-pc="${m.n}-0"]`), eb = document.querySelector(`[data-pc="${m.n}-1"]`);
+        if (ea) ea.textContent = (p * 100).toFixed(0) + "%";
+        if (eb) eb.textContent = ((1 - p) * 100).toFixed(0) + "%";
+      });
+    }
+  }
+  // champion
+  const champ = picks[104];
+  $("champCard").style.display = champ ? "" : "none";
+  if (champ) $("champName").textContent = "🏆 " + cap(champ).toUpperCase();
+}
+
+async function modelPicksAll() {
+  if (!bracketData) return;
+  if (thirds.size !== 8) return toast("Select exactly 8 thirds first (or hit Reset)", true);
+  const thirdAssign = assignThirds();
+  toast("Model simulating the bracket…");
+  for (const m of bracketData.knockout) {
+    const teams = m.slots.map(s => resolveSlot(s, thirdAssign, m.n));
+    if (teams[0] && teams[1] && !picks[m.n]) {
+      const p = await koProb(teams[0], teams[1]);
+      picks[m.n] = p >= 0.5 ? teams[0] : teams[1];
+    }
+  }
+  renderKO();
+}
+
+/* ---------- odds board ---------- */
+let oddsLoaded = false;
+async function loadOdds() {
+  const rows = await (await fetch("/api/oddsboard")).json();
+  if (rows.error) return toast(rows.error, true);
+  oddsLoaded = true;
+  const stage = (m) => m.homeSlug && ratingsKnown(m) ? "Groups" : "KO";
+  const ratingsKnown = (m) => m.model != null;
+  $("oddsTable").querySelector("tbody").innerHTML = rows.map(m => {
+    const score = m.status !== "not_started" && m.homeScore != null ? `${m.homeScore}-${m.awayScore}` : "—";
+    if (!m.model) return `<tr><td>${m.start.slice(5, 10)}</td><td><span class="stagePill">KO</span></td>
+      <td style="color:var(--dim)">${m.homeName} v ${m.awayName}</td><td colspan="8" style="color:var(--dim)">teams TBD</td><td>${score}</td></tr>`;
+    const f = m.model;
+    const fav = Math.max(f.winA, f.draw, f.winB);
+    const c = (x) => `<td class="num ${x === fav ? "fav" : ""}">${(x * 100).toFixed(0)}%</td>`;
+    return `<tr>
+      <td>${m.start.slice(5, 10)}</td><td><span class="stagePill">Groups</span></td>
+      <td>${m.homeName} v ${m.awayName}</td>
+      ${c(f.winA)}${c(f.draw)}${c(f.winB)}
+      <td class="num">${f.fairA.toFixed(2)}</td><td class="num">${f.fairD.toFixed(2)}</td><td class="num">${f.fairB.toFixed(2)}</td>
+      <td class="num">${(f.over25 * 100).toFixed(0)}%</td>
+      <td>${f.topScore.score} (${(f.topScore.p * 100).toFixed(0)}%)</td>
+      <td>${score}</td></tr>`;
+  }).join("");
+}
+
 function toast(msg, isErr = false) {
   const t = $("toast");
   t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
@@ -851,6 +1145,9 @@ async function init() {
   });
   $("goLive").addEventListener("click", () => liveTimer ? stopLive("Live polling stopped") : startLive());
   $("demoLive").addEventListener("click", () => pollLive(true));
+  for (const b of document.querySelectorAll(".tabbar button")) b.addEventListener("click", () => switchTab(b.dataset.tab));
+  $("modelPicks").addEventListener("click", modelPicksAll);
+  $("resetBracket").addEventListener("click", resetBracket);
   $("log").addEventListener("click", (e) => { if (e.target.dataset?.file) setActual(e.target.dataset.file); });
   refresh(); loadIntel(); loadLog(); loadMatches();
 }
