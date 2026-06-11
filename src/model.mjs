@@ -47,6 +47,44 @@ export function clampAdjust(x) {
   return Math.max(ADJUST_MIN, Math.min(ADJUST_MAX, x));
 }
 
+// Tactical approach: -2 (very defensive) … 0 (balanced) … +2 (very attacking).
+// An attacking setup raises your own expected goals but also opens space for the
+// opponent; a defensive one suppresses both. Asymmetric on purpose — parking the
+// bus cuts what you concede more than what you score is NOT true at this level,
+// so suppression is weaker than creation.
+export function styleMultipliers(styleA, styleB) {
+  const sA = Math.max(-2, Math.min(2, styleA | 0));
+  const sB = Math.max(-2, Math.min(2, styleB | 0));
+  const own = (s) => 1 + 0.05 * s;       // your approach on your own goals
+  const given = (s) => 1 + 0.035 * s;    // your approach on goals you concede
+  const clampTotal = (x) => Math.max(0.8, Math.min(1.2, x));
+  return {
+    mA: clampTotal(own(sA) * given(sB)),  // multiplier on team A's lambda
+    mB: clampTotal(own(sB) * given(sA)),  // multiplier on team B's lambda
+  };
+}
+
+// Corners estimate. No public corner data for internationals in our dataset, so this
+// is a calibrated heuristic, not a fitted model: international average ~9.5 total
+// corners; more expected goals and more attacking setups → more corners. Split
+// follows attacking share. Treat the output as an estimate band, not gospel.
+export function cornersEstimate(lambda, mu, styleA = 0, styleB = 0) {
+  const BASE = 9.5, AVG_XG = 2.7;
+  const total = BASE * Math.sqrt((lambda + mu) / AVG_XG) * (1 + 0.03 * (styleA + styleB));
+  const wA = Math.pow(lambda, 0.8), wB = Math.pow(mu, 0.8);
+  const teamA = total * wA / (wA + wB), teamB = total - total * wA / (wA + wB);
+  const over = (line) => {
+    // P(total corners > line), Poisson
+    let cdf = 0;
+    for (let k = 0; k <= Math.floor(line); k++) cdf += poissonPmf(k, total);
+    return 1 - cdf;
+  };
+  return {
+    total, teamA, teamB,
+    over: { "8.5": over(8.5), "9.5": over(9.5), "10.5": over(10.5), "11.5": over(11.5) },
+  };
+}
+
 export function baseLambdas(teamA, teamB, home = null) {
   const ra = ratings[teamA], rb = ratings[teamB];
   if (ra == null || rb == null) throw new Error(`Unknown team: ${ra == null ? teamA : teamB}`);

@@ -3,123 +3,208 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WC26 Predictor</title>
+<title>WC26 Match Center</title>
 <style>
   :root {
-    --bg: #0b0f14; --panel: #121925; --panel2: #0e141e; --line: #1f2c3d;
-    --text: #e8eef5; --dim: #8295ab; --accent: #34d399; --accent2: #fbbf24;
+    --bg: #0a0e13; --panel: #131a26; --panel2: #0e1520; --line: #213044;
+    --text: #e8eef5; --dim: #7e93ab; --accent: #34d399; --gold: #fbbf24;
     --red: #f87171; --blue: #60a5fa;
+    --pitch1: #1a4731; --pitch2: #15402b; --pitchline: rgba(255,255,255,.25);
   }
   * { box-sizing: border-box; margin: 0; }
   body {
-    background: radial-gradient(1200px 600px at 70% -10%, #122033 0%, var(--bg) 55%);
-    color: var(--text); font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
-    min-height: 100vh; padding: 28px 20px 60px;
+    background: radial-gradient(1400px 700px at 70% -10%, #101d31 0%, var(--bg) 55%);
+    color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh; padding: 22px 18px 60px;
   }
-  .wrap { max-width: 980px; margin: 0 auto; }
-  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 26px; }
-  h1 { font-size: 26px; letter-spacing: .5px; }
+  .wrap { max-width: 1340px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+  h1 { font-size: 22px; letter-spacing: 1px; }
   h1 .ball { color: var(--accent); }
-  header .sub { color: var(--dim); font-size: 13px; }
-  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 18px; }
-  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  header .sub { color: var(--dim); font-size: 12px; }
   .card {
     background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
-    border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+    border: 1px solid var(--line); border-radius: 14px; padding: 16px;
   }
-  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-bottom: 14px; }
-  label { display: block; font-size: 12px; color: var(--dim); margin: 12px 0 4px; }
-  select, textarea, input[type=number] {
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-bottom: 12px; }
+  .layout { display: grid; grid-template-columns: 320px 1fr 320px; gap: 14px; align-items: start; }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 11px; color: var(--dim); margin: 10px 0 4px; }
+  select, textarea, input[type=text], input[type=number] {
     width: 100%; background: #0a1018; color: var(--text); border: 1px solid var(--line);
-    border-radius: 8px; padding: 8px 10px; font: inherit;
+    border-radius: 8px; padding: 7px 9px; font: inherit;
   }
-  select:focus, textarea:focus { outline: 1px solid var(--accent); }
-  .vs { text-align: center; color: var(--dim); font-size: 12px; margin: 6px 0; letter-spacing: 3px; }
-  .sliderRow { display: flex; align-items: center; gap: 10px; }
-  input[type=range] { flex: 1; accent-color: var(--accent); }
-  .sliderVal { width: 52px; text-align: right; font-variant-numeric: tabular-nums; color: var(--accent2); }
-  .resetBtn { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
-  .saveBtn {
-    width: 100%; margin-top: 16px; padding: 10px; border: none; border-radius: 8px;
-    background: var(--accent); color: #06281c; font-weight: 700; font-size: 14px; cursor: pointer;
+  select:focus, textarea:focus, input:focus { outline: 1px solid var(--accent); }
+
+  /* style segmented control */
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { flex: 1; background: #0a1018; border: none; color: var(--dim); padding: 7px 0; cursor: pointer; font-size: 14px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent); color: #06281c; font-weight: 700; }
+  .seg button:hover:not(.on) { color: var(--text); }
+  .styleName { text-align: center; font-size: 11px; color: var(--gold); margin-top: 4px; letter-spacing: 1px; }
+
+  /* pitch */
+  .pitch {
+    position: relative; margin-top: 12px; border-radius: 10px; overflow: hidden;
+    background:
+      repeating-linear-gradient(0deg, var(--pitch1) 0 36px, var(--pitch2) 36px 72px);
+    border: 1px solid #2a5a40; aspect-ratio: 3 / 4;
   }
-  .saveBtn:hover { filter: brightness(1.1); }
-  .matchTitle { font-size: 20px; font-weight: 600; margin-bottom: 2px; }
-  .matchTitle .elo { color: var(--dim); font-size: 13px; font-weight: 400; }
-  .probRow { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
-  .probRow .lbl { width: 110px; font-size: 13px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .barTrack { flex: 1; height: 22px; background: #0a1018; border-radius: 6px; position: relative; overflow: hidden; }
+  .pitch svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .chip {
+    position: absolute; transform: translate(-50%, -50%); width: 76px; text-align: center;
+  }
+  .chip input {
+    width: 100%; background: rgba(7,14,11,.78); border: 1px solid rgba(255,255,255,.18);
+    color: #fff; font-size: 10.5px; text-align: center; border-radius: 7px; padding: 4px 3px;
+  }
+  .chip input:focus { border-color: var(--accent); outline: none; }
+  .chip .pos { font-size: 9px; color: rgba(255,255,255,.75); letter-spacing: 1px; text-shadow: 0 1px 2px #000; }
+  .loadRow { display: flex; gap: 6px; margin-top: 10px; }
+  .loadRow input { flex: 1; }
+  .btn { background: #0a1018; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); }
+
+  /* prediction center */
+  .matchTitle { font-size: 19px; font-weight: 600; text-align: center; margin-bottom: 4px; }
+  .matchTitle .elo { color: var(--dim); font-size: 12px; font-weight: 400; }
+  .probRow { display: flex; align-items: center; gap: 10px; margin: 9px 0; }
+  .probRow .lbl { width: 105px; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .barTrack { flex: 1; height: 24px; background: #0a1018; border-radius: 6px; position: relative; overflow: hidden; }
   .barFill { height: 100%; border-radius: 6px; transition: width .25s; }
-  .barGhost { position: absolute; top: 0; height: 100%; border-right: 2px dashed rgba(255,255,255,.45); }
-  .probRow .val { width: 58px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .barGhost { position: absolute; top: 0; height: 100%; border-right: 2px dashed rgba(255,255,255,.5); }
+  .probRow .val { width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
   .winA .barFill { background: linear-gradient(90deg, #10b981, #34d399); }
   .draw .barFill { background: linear-gradient(90deg, #475569, #64748b); }
   .winB .barFill { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
-  .statChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-  .chip { background: #0a1018; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 13px; }
-  .chip b { color: var(--accent2); }
-  .scores { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-  .score { background: #0a1018; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; text-align: center; min-width: 70px; }
-  .score .s { font-size: 17px; font-weight: 700; }
-  .score .p { font-size: 12px; color: var(--accent); }
-  .baselineNote { margin-top: 12px; font-size: 12px; color: var(--dim); }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
-  th { text-align: left; color: var(--dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-  td { padding: 7px 8px; border-bottom: 1px solid #16202e; font-variant-numeric: tabular-nums; }
+  .statChips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; justify-content: center; }
+  .chip2 { background: #0a1018; border: 1px solid var(--line); border-radius: 8px; padding: 5px 11px; font-size: 12px; }
+  .chip2 b { color: var(--gold); }
+  .scores { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; justify-content: center; }
+  .score { background: #0a1018; border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px; text-align: center; min-width: 64px; }
+  .score .s { font-size: 16px; font-weight: 700; }
+  .score .p { font-size: 11px; color: var(--accent); }
+  .baselineNote { margin-top: 10px; font-size: 11px; color: var(--dim); text-align: center; }
+  .cornersCard { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .cornersGrid { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+  .saveBtn {
+    width: 100%; margin-top: 14px; padding: 11px; border: none; border-radius: 8px;
+    background: var(--accent); color: #06281c; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .saveBtn:hover { filter: brightness(1.1); }
+
+  /* intel */
+  .intelGrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 1100px) { .intelGrid { grid-template-columns: 1fr; } }
+  .pillRow { display: flex; align-items: center; gap: 5px; margin: 5px 0; font-size: 12px; }
+  .pillRow .tag { color: var(--dim); width: 52px; font-size: 11px; }
+  .pill { width: 20px; height: 20px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
+  .pill.W { background: #10b98133; color: #34d399; border: 1px solid #10b98166; }
+  .pill.D { background: #64748b33; color: #94a3b8; border: 1px solid #64748b66; }
+  .pill.L { background: #ef444433; color: #f87171; border: 1px solid #ef444466; }
+  .pillRow .agg { margin-left: auto; color: var(--dim); font-size: 11px; }
+  .formList { margin-top: 8px; font-size: 11px; color: var(--dim); }
+  .formList div { padding: 2px 0; border-bottom: 1px dashed #1a2636; display: flex; gap: 6px; }
+  .formList .r { font-weight: 800; width: 12px; }
+  .formList .r.W { color: var(--accent); } .formList .r.D { color: #94a3b8; } .formList .r.L { color: var(--red); }
+  .h2hRow { display: flex; gap: 8px; font-size: 12px; padding: 4px 0; border-bottom: 1px dashed #1a2636; }
+  .h2hRow .sc { font-weight: 800; color: var(--gold); }
+  .empty { color: var(--dim); font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  th { text-align: left; color: var(--dim); font-weight: 500; padding: 5px 7px; border-bottom: 1px solid var(--line); }
+  td { padding: 6px 7px; border-bottom: 1px solid #16202e; font-variant-numeric: tabular-nums; }
   td .hit { color: var(--accent); } td .miss { color: var(--red); }
-  .actualIn { width: 34px; text-align: center; padding: 3px; }
+  .actualIn { width: 32px; text-align: center; padding: 3px; }
   .okBtn { background: var(--line); border: none; color: var(--text); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
-  .logCard { margin-top: 18px; }
-  .toast { position: fixed; bottom: 22px; right: 22px; background: var(--accent); color: #06281c; padding: 10px 18px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .logCard { margin-top: 14px; }
+  .toast { position: fixed; bottom: 22px; right: 22px; background: var(--accent); color: #06281c; padding: 10px 18px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9; }
   .toast.show { opacity: 1; }
+  .toast.err { background: var(--red); color: #2b0707; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1><span class="ball">●</span> WC26 Predictor</h1>
-    <span class="sub">Elo · Dixon-Coles · tactical layer — personal build</span>
+    <h1><span class="ball">●</span> WC26 MATCH CENTER</h1>
+    <span class="sub">Elo · Dixon-Coles core · tactical layer · personal build</span>
+    <span class="sub" style="margin-left:auto">
+      Venue:
+      <select id="venue" style="width:auto;display:inline-block;padding:4px 8px">
+        <option value="">Neutral</option><option value="A">Team A home</option><option value="B">Team B home</option>
+      </select>
+    </span>
   </header>
 
-  <div class="grid">
+  <div class="layout">
+    <!-- TEAM A -->
     <div class="card">
-      <h2>Match setup</h2>
-      <label>Team A</label>
+      <h2>Team A</h2>
       <select id="teamA"></select>
-      <div class="vs">VS</div>
-      <label>Team B</label>
-      <select id="teamB"></select>
-      <label>Venue</label>
-      <select id="venue">
-        <option value="">Neutral</option>
-        <option value="A">Team A at home</option>
-        <option value="B">Team B at home</option>
+      <label>Tactical approach</label>
+      <div class="seg" id="segA"></div>
+      <div class="styleName" id="styleNameA">BALANCED</div>
+      <label>Formation</label>
+      <select id="formationA">
+        <option>4-3-3</option><option>4-2-3-1</option><option>4-4-2</option><option>4-1-4-1</option>
+        <option>3-5-2</option><option>3-4-3</option><option>5-4-1</option><option>5-3-2</option><option>4-5-1</option>
       </select>
-
-      <h2 style="margin-top:22px">Tactical adjustment</h2>
-      <label>Team A attack <button class="resetBtn" data-reset="la">reset</button></label>
-      <div class="sliderRow"><input type="range" id="la" min="0.85" max="1.15" step="0.01" value="1"><span class="sliderVal" id="laVal">×1.00</span></div>
-      <label>Team B attack <button class="resetBtn" data-reset="lb">reset</button></label>
-      <div class="sliderRow"><input type="range" id="lb" min="0.85" max="1.15" step="0.01" value="1"><span class="sliderVal" id="lbVal">×1.00</span></div>
-      <label>Reasoning (saved with prediction)</label>
-      <textarea id="reasoning" rows="3" placeholder="Why the sliders moved — missing players, style matchup, rest…"></textarea>
-      <button class="saveBtn" id="saveBtn">Save prediction</button>
+      <div class="pitch" id="pitchA"></div>
+      <div class="loadRow">
+        <input type="text" id="fixtureA" placeholder="fixture id">
+        <button class="btn" id="loadA">Load XI</button>
+      </div>
     </div>
 
+    <!-- CENTER -->
     <div class="card">
-      <h2>Prediction</h2>
+      <h2 style="text-align:center">Prediction</h2>
       <div class="matchTitle" id="title">—</div>
       <div id="probs"></div>
       <div class="statChips" id="chips"></div>
       <div class="scores" id="scores"></div>
       <div class="baselineNote" id="baselineNote"></div>
+      <div class="cornersCard">
+        <h2 style="text-align:center">Corners (estimate)</h2>
+        <div class="cornersGrid" id="corners"></div>
+      </div>
+      <label>Notes / reasoning (saved with prediction)</label>
+      <textarea id="reasoning" rows="2" placeholder="Why this setup — injuries, style matchup, form…"></textarea>
+      <button class="saveBtn" id="saveBtn">Save prediction</button>
     </div>
+
+    <!-- TEAM B -->
+    <div class="card">
+      <h2>Team B</h2>
+      <select id="teamB"></select>
+      <label>Tactical approach</label>
+      <div class="seg" id="segB"></div>
+      <div class="styleName" id="styleNameB">BALANCED</div>
+      <label>Formation</label>
+      <select id="formationB">
+        <option>4-3-3</option><option>4-2-3-1</option><option>4-4-2</option><option>4-1-4-1</option>
+        <option>3-5-2</option><option>3-4-3</option><option>5-4-1</option><option>5-3-2</option><option>4-5-1</option>
+      </select>
+      <div class="pitch" id="pitchB"></div>
+      <div class="loadRow">
+        <input type="text" id="fixtureB" placeholder="fixture id">
+        <button class="btn" id="loadB">Load XI</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTEL -->
+  <div class="intelGrid">
+    <div class="card"><h2 id="intelTitleA">Team A — form</h2><div id="intelA"></div></div>
+    <div class="card"><h2>Head to head <span style="text-transform:none;letter-spacing:0">(since Oct 2023)</span></h2><div id="h2h"></div></div>
+    <div class="card"><h2 id="intelTitleB">Team B — form</h2><div id="intelB"></div></div>
   </div>
 
   <div class="card logCard">
     <h2>Prediction log</h2>
     <div style="overflow-x:auto"><table id="log"><thead>
-      <tr><th>date</th><th>match</th><th>model (1X2)</th><th>top score</th><th>actual</th><th>result</th></tr>
+      <tr><th>date</th><th>match</th><th>setup</th><th>model (1X2)</th><th>top score</th><th>corners est</th><th>actual</th><th>result</th></tr>
     </thead><tbody></tbody></table></div>
   </div>
 </div>
@@ -128,47 +213,122 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const pct = (x) => (x * 100).toFixed(1) + "%";
-const cap = (s) => s.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
-let current = null, debounce = null;
+const pct0 = (x) => (x * 100).toFixed(0) + "%";
+const cap = (s) => String(s).split("-").map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(" ");
+const STYLE_NAMES = { "-2": "VERY DEFENSIVE", "-1": "DEFENSIVE", "0": "BALANCED", "1": "ATTACKING", "2": "VERY ATTACKING" };
+const STYLE_ICONS = ["🛡🛡", "🛡", "⚖", "⚔", "⚔⚔"];
+let styles = { A: 0, B: 0 };
+let debounce = null;
 
-async function init() {
-  const teams = await (await fetch("/api/teams")).json();
-  for (const sel of [$("teamA"), $("teamB")]) {
-    sel.innerHTML = teams.map(t => `<option value="${t.name}">${cap(t.name)} (${t.elo})</option>`).join("");
+/* ---------- pitch ---------- */
+const PITCH_SVG = `<svg viewBox="0 0 300 400" preserveAspectRatio="none">
+  <g stroke="var(--pitchline)" stroke-width="2" fill="none">
+    <rect x="6" y="6" width="288" height="388" rx="4"/>
+    <line x1="6" y1="200" x2="294" y2="200"/>
+    <circle cx="150" cy="200" r="34"/>
+    <rect x="75" y="6" width="150" height="58"/>
+    <rect x="113" y="6" width="74" height="24"/>
+    <rect x="75" y="336" width="150" height="58"/>
+    <rect x="113" y="370" width="74" height="24"/>
+  </g></svg>`;
+
+function rowLabel(rowIdx, rowCount, n, i) {
+  if (rowIdx === 0) { // defenders
+    if (n === 4) return ["LB", "CB", "CB", "RB"][i];
+    if (n === 5) return ["LWB", "CB", "CB", "CB", "RWB"][i];
+    if (n === 3) return ["CB", "CB", "CB"][i];
   }
-  $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "A";
-  for (const id of ["teamA", "teamB", "venue"]) $(id).addEventListener("change", refresh);
-  for (const id of ["la", "lb"]) $(id).addEventListener("input", () => {
-    $(id + "Val").textContent = "×" + parseFloat($(id).value).toFixed(2);
-    clearTimeout(debounce); debounce = setTimeout(refresh, 120);
-  });
-  $("saveBtn").addEventListener("click", savePrediction);
-  for (const btn of document.querySelectorAll("[data-reset]")) {
-    btn.addEventListener("click", () => resetSlider(btn.dataset.reset));
+  if (rowIdx === rowCount - 1) { // attackers
+    if (n === 3) return ["LW", "ST", "RW"][i];
+    if (n === 2) return ["ST", "ST"][i];
+    if (n === 1) return ["ST"][i];
   }
-  $("log").addEventListener("click", (e) => {
-    if (e.target.dataset?.file) setActual(e.target.dataset.file);
-  });
-  refresh(); loadLog();
+  return n >= 4 ? ["LM", "CM", "CM", "RM", "CM"][i] ?? "CM" : "CM";
 }
 
-function resetSlider(id) { $(id).value = 1; $(id + "Val").textContent = "×1.00"; refresh(); }
+// Render a formation: GK at bottom, defense → attack upward.
+function renderPitch(side) {
+  const pitch = $("pitch" + side);
+  const formation = $("formation" + side).value;
+  const old = getPlayers(side); // keep typed names across formation changes
+  pitch.innerHTML = PITCH_SVG;
+  const rows = formation.split("-").map(Number);
+  const slots = [{ x: 50, y: 91, pos: "GK" }];
+  rows.forEach((n, r) => {
+    const y = 76 - (r + 1) * (62 / (rows.length + 0.4));
+    for (let i = 0; i < n; i++) {
+      slots.push({ x: n === 1 ? 50 : 10 + (80 / (n - 1)) * i, y, pos: rowLabel(r, rows.length, n, i) });
+    }
+  });
+  slots.forEach((s, i) => {
+    const div = document.createElement("div");
+    div.className = "chip";
+    div.style.left = s.x + "%"; div.style.top = s.y + "%";
+    div.innerHTML = `<div class="pos">${s.pos}</div><input data-slot="${i}" placeholder="${s.pos}" value="${old[i] ?? ""}">`;
+    pitch.appendChild(div);
+  });
+  for (const inp of pitch.querySelectorAll("input")) inp.addEventListener("change", () => persistLineup(side));
+}
 
+function getPlayers(side) {
+  return [...$("pitch" + side).querySelectorAll("input")].map(i => i.value.trim());
+}
+function setPlayers(side, names) {
+  const inputs = [...$("pitch" + side).querySelectorAll("input")];
+  inputs.forEach((inp, i) => inp.value = names[i] ?? "");
+  persistLineup(side);
+}
+function persistLineup(side) {
+  const team = $("team" + side).value;
+  localStorage.setItem("wc26_" + team, JSON.stringify({ formation: $("formation" + side).value, players: getPlayers(side) }));
+}
+function restoreLineup(side) {
+  const saved = localStorage.getItem("wc26_" + $("team" + side).value);
+  if (saved) {
+    const { formation, players } = JSON.parse(saved);
+    $("formation" + side).value = formation;
+    renderPitch(side);
+    setPlayers(side, players);
+  } else {
+    renderPitch(side);
+  }
+}
+
+/* ---------- style segments ---------- */
+function buildSeg(side) {
+  const seg = $("seg" + side);
+  seg.innerHTML = "";
+  for (let v = -2; v <= 2; v++) {
+    const b = document.createElement("button");
+    b.textContent = STYLE_ICONS[v + 2];
+    b.title = STYLE_NAMES[v];
+    b.dataset.v = v;
+    if (v === styles[side]) b.classList.add("on");
+    b.addEventListener("click", () => {
+      styles[side] = v;
+      $("styleName" + side).textContent = STYLE_NAMES[v];
+      for (const x of seg.children) x.classList.toggle("on", x === b);
+      refresh();
+    });
+    seg.appendChild(b);
+  }
+}
+
+/* ---------- prediction ---------- */
 async function refresh() {
   const a = $("teamA").value, b = $("teamB").value;
-  if (a === b) { $("title").textContent = "pick two different teams"; return; }
+  if (!a || !b || a === b) { $("title").textContent = "pick two different teams"; return; }
   const home = $("venue").value === "A" ? a : $("venue").value === "B" ? b : "";
-  const q = new URLSearchParams({ a, b, home, la: $("la").value, lb: $("lb").value });
+  const q = new URLSearchParams({ a, b, home, sa: styles.A, sb: styles.B });
   const d = await (await fetch("/api/predict?" + q)).json();
   if (d.error) { $("title").textContent = d.error; return; }
-  current = d;
   const f = d.adjusted ?? d.baseline;
-  $("title").innerHTML = `${cap(d.teamA)} <span class="elo">${d.eloA}</span> &nbsp;vs&nbsp; ${cap(d.teamB)} <span class="elo">${d.eloB}</span>` +
-    (d.home ? ` <span class="elo">· ${cap(d.home)} home</span>` : ` <span class="elo">· neutral</span>`);
+  $("title").innerHTML = `${cap(d.teamA)} <span class="elo">${d.eloA}</span> &nbsp;v&nbsp; ${cap(d.teamB)} <span class="elo">${d.eloB}</span>` +
+    `<div class="elo">${d.home ? cap(d.home) + " at home" : "neutral venue"} · ${STYLE_NAMES[styles.A].toLowerCase()} v ${STYLE_NAMES[styles.B].toLowerCase()}</div>`;
   const rows = [
-    ["winA", cap(d.teamA) + " win", f.winA, d.baseline.winA],
+    ["winA", cap(d.teamA), f.winA, d.baseline.winA],
     ["draw", "Draw", f.draw, d.baseline.draw],
-    ["winB", cap(d.teamB) + " win", f.winB, d.baseline.winB],
+    ["winB", cap(d.teamB), f.winB, d.baseline.winB],
   ];
   $("probs").innerHTML = rows.map(([cls, lbl, v, base]) => `
     <div class="probRow ${cls}">
@@ -178,26 +338,83 @@ async function refresh() {
       <div class="val">${pct(v)}</div>
     </div>`).join("");
   $("chips").innerHTML = `
-    <div class="chip">xG <b>${f.lambda.toFixed(2)} – ${f.mu.toFixed(2)}</b></div>
-    <div class="chip">over 2.5 <b>${pct(f.over25)}</b></div>
-    <div class="chip">both score <b>${pct(f.btts)}</b></div>`;
+    <div class="chip2">xG <b>${f.lambda.toFixed(2)} – ${f.mu.toFixed(2)}</b></div>
+    <div class="chip2">over 2.5 <b>${pct(f.over25)}</b></div>
+    <div class="chip2">both score <b>${pct(f.btts)}</b></div>`;
   $("scores").innerHTML = f.topScorelines.map(s =>
     `<div class="score"><div class="s">${s.score}</div><div class="p">${pct(s.p)}</div></div>`).join("");
   $("baselineNote").textContent = d.adjusted
-    ? `dashed line = baseline (${pct(d.baseline.winA)} / ${pct(d.baseline.draw)} / ${pct(d.baseline.winB)}) — sliders ×${d.mA.toFixed(2)} / ×${d.mB.toFixed(2)}`
-    : "pure Elo baseline — move the sliders to apply tactical adjustments";
+    ? `dashed = pure Elo baseline (${pct(d.baseline.winA)} / ${pct(d.baseline.draw)} / ${pct(d.baseline.winB)}) · style effect ×${d.mA.toFixed(2)} / ×${d.mB.toFixed(2)}`
+    : "pure Elo baseline — set tactical approaches to shape the prediction";
+  const c = d.corners;
+  $("corners").innerHTML = `
+    <div class="chip2">total <b>${c.total.toFixed(1)}</b></div>
+    <div class="chip2">${cap(d.teamA)} <b>${c.teamA.toFixed(1)}</b></div>
+    <div class="chip2">${cap(d.teamB)} <b>${c.teamB.toFixed(1)}</b></div>
+    <div class="chip2">o8.5 <b>${pct0(c.over["8.5"])}</b></div>
+    <div class="chip2">o9.5 <b>${pct0(c.over["9.5"])}</b></div>
+    <div class="chip2">o10.5 <b>${pct0(c.over["10.5"])}</b></div>
+    <div class="chip2">o11.5 <b>${pct0(c.over["11.5"])}</b></div>`;
 }
 
+/* ---------- intel ---------- */
+function pillRow(tag, rows) {
+  const s = rows.reduce((acc, r) => { acc[r.result]++; acc.gf += r.gf; acc.ga += r.ga; return acc; }, { W: 0, D: 0, L: 0, gf: 0, ga: 0 });
+  return `<div class="pillRow"><span class="tag">${tag}</span>` +
+    rows.map(r => `<span class="pill ${r.result}" title="${r.date} ${r.venue === "H" ? "vs" : "@"} ${cap(r.opponentName)} ${r.gf}-${r.ga}">${r.result}</span>`).join("") +
+    `<span class="agg">${s.gf}-${s.ga}</span></div>`;
+}
+function formList(rows) {
+  return `<div class="formList">` + rows.map(r =>
+    `<div><span class="r ${r.result}">${r.result}</span><span>${r.gf}-${r.ga}</span><span>${r.venue === "H" ? "vs" : "@"} ${cap(r.opponentName)}</span><span style="margin-left:auto">${r.date.slice(5)}</span></div>`).join("") + `</div>`;
+}
+async function loadIntel() {
+  const a = $("teamA").value, b = $("teamB").value;
+  if (!a || !b || a === b) return;
+  const d = await (await fetch(`/api/intel?a=${a}&b=${b}`)).json();
+  $("intelTitleA").textContent = cap(a) + " — form";
+  $("intelTitleB").textContent = cap(b) + " — form";
+  $("intelA").innerHTML = pillRow("last 5", d.formA.overall) + pillRow("home", d.formA.home) + pillRow("away", d.formA.away) + formList(d.formA.overall);
+  $("intelB").innerHTML = pillRow("last 5", d.formB.overall) + pillRow("home", d.formB.home) + pillRow("away", d.formB.away) + formList(d.formB.overall);
+  $("h2h").innerHTML = d.h2h.length
+    ? d.h2h.map(m => `<div class="h2hRow"><span>${m.date}</span><span class="sc">${m.gf}-${m.ga}</span><span>${cap(m.perspective)} ${m.venue === "H" ? "(H)" : "(A)"}</span><span style="margin-left:auto;color:var(--dim)">${m.league}</span></div>`).join("")
+    : `<div class="empty">No meetings since Oct 2023 in the dataset.</div>`;
+}
+
+/* ---------- lineups via API ---------- */
+async function loadXI(side) {
+  const fixture = $("fixture" + side).value.trim();
+  if (!fixture) return toast("Enter a fixture id (api-football)", true);
+  const d = await (await fetch(`/api/lineups?fixture=${fixture}`)).json();
+  if (d.error) return toast(d.error, true);
+  if (!d.length) return toast("Lineups not published yet (~1h before KO)", true);
+  const want = cap($("team" + side).value).toLowerCase();
+  const t = d.find(x => x.team.toLowerCase().includes(want.split(" ")[0])) ?? d[side === "A" ? 0 : 1];
+  if (t.formation) {
+    const sel = $("formation" + side);
+    if (![...sel.options].some(o => o.value === t.formation)) sel.add(new Option(t.formation, t.formation));
+    sel.value = t.formation;
+    renderPitch(side);
+  }
+  setPlayers(side, t.startXI.map(p => p.name));
+  toast(`${t.team} XI loaded (${t.formation})`);
+}
+
+/* ---------- save & log ---------- */
 async function savePrediction() {
-  // Read the live controls, not cached state — avoids saving a stale snapshot.
   const teamA = $("teamA").value, teamB = $("teamB").value;
   if (!teamA || !teamB || teamA === teamB) return;
   const home = $("venue").value === "A" ? teamA : $("venue").value === "B" ? teamB : null;
   const res = await (await fetch("/api/save", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ teamA, teamB, home, mA: parseFloat($("la").value), mB: parseFloat($("lb").value), reasoning: $("reasoning").value }),
+    body: JSON.stringify({
+      teamA, teamB, home, styleA: styles.A, styleB: styles.B,
+      formationA: $("formationA").value, formationB: $("formationB").value,
+      lineupA: getPlayers("A"), lineupB: getPlayers("B"),
+      reasoning: $("reasoning").value,
+    }),
   })).json();
-  toast(res.saved ? "Saved " + res.saved : "Error: " + res.error);
+  toast(res.saved ? "Saved " + res.saved : "Error: " + res.error, !res.saved);
   loadLog();
 }
 
@@ -208,11 +425,11 @@ async function loadLog() {
     const top = f.topScorelines[0];
     let result = "—";
     if (l.actual) {
-      const { goalsA, goalsB } = l.actual;
-      const out = goalsA > goalsB ? "winA" : goalsA < goalsB ? "winB" : "draw";
+      const out = l.actual.goalsA > l.actual.goalsB ? "winA" : l.actual.goalsA < l.actual.goalsB ? "winB" : "draw";
       const predOut = f.winA >= f.draw && f.winA >= f.winB ? "winA" : f.winB >= f.draw ? "winB" : "draw";
       result = `<span class="${out === predOut ? "hit" : "miss"}">${out === predOut ? "✓ hit" : "✗ miss"}</span>`;
     }
+    const setup = (l.styleA !== undefined) ? `${l.formationA ?? "?"} ${STYLE_ICONS[(l.styleA ?? 0) + 2]} v ${STYLE_ICONS[(l.styleB ?? 0) + 2]} ${l.formationB ?? "?"}` : "—";
     const actualCell = l.actual
       ? `${l.actual.goalsA}-${l.actual.goalsB}`
       : `<input class="actualIn" id="ga_${l.file}" type="number" min="0"> – <input class="actualIn" id="gb_${l.file}" type="number" min="0">
@@ -220,12 +437,14 @@ async function loadLog() {
     return `<tr>
       <td>${l.date.slice(0, 10)}</td>
       <td>${cap(l.teamA)} v ${cap(l.teamB)}</td>
+      <td>${setup}</td>
       <td>${pct(f.winA)} / ${pct(f.draw)} / ${pct(f.winB)}</td>
       <td>${top.score} (${pct(top.p)})</td>
+      <td>${l.corners ? l.corners.total.toFixed(1) : "—"}</td>
       <td>${actualCell}</td>
       <td>${result}</td>
     </tr>`;
-  }).join("") || `<tr><td colspan="6" style="color:var(--dim)">no saved predictions yet</td></tr>`;
+  }).join("") || `<tr><td colspan="8" class="empty" style="padding:10px">no saved predictions yet</td></tr>`;
 }
 
 async function setActual(file) {
@@ -238,9 +457,32 @@ async function setActual(file) {
   loadLog();
 }
 
-function toast(msg) {
-  $("toast").textContent = msg; $("toast").classList.add("show");
-  setTimeout(() => $("toast").classList.remove("show"), 2200);
+function toast(msg, isErr = false) {
+  const t = $("toast");
+  t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
+  setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ---------- init ---------- */
+async function init() {
+  const teams = await (await fetch("/api/teams")).json();
+  for (const sel of [$("teamA"), $("teamB")]) {
+    sel.innerHTML = teams.map(t => `<option value="${t.name}">${cap(t.name)} (${t.elo})</option>`).join("");
+  }
+  $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "A";
+  buildSeg("A"); buildSeg("B");
+  restoreLineup("A"); restoreLineup("B");
+  for (const id of ["teamA", "teamB"]) $(id).addEventListener("change", () => {
+    restoreLineup(id === "teamA" ? "A" : "B"); refresh(); loadIntel();
+  });
+  $("venue").addEventListener("change", refresh);
+  $("formationA").addEventListener("change", () => { renderPitch("A"); persistLineup("A"); });
+  $("formationB").addEventListener("change", () => { renderPitch("B"); persistLineup("B"); });
+  $("saveBtn").addEventListener("click", savePrediction);
+  $("loadA").addEventListener("click", () => loadXI("A"));
+  $("loadB").addEventListener("click", () => loadXI("B"));
+  $("log").addEventListener("click", (e) => { if (e.target.dataset?.file) setActual(e.target.dataset.file); });
+  refresh(); loadIntel(); loadLog();
 }
 init();
 </script>

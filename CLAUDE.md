@@ -7,10 +7,11 @@ MIT) plus a bounded tactical-adjustment layer driven by Claude as analyst.
 ## Layout
 
 - `engine/` — upstream statistical model (separate git clone; don't edit, `git pull` for updates)
-- `src/model.mjs` — shared prediction math (Dixon-Coles grid, adjustment clamping)
-- `src/predict.mjs` — CLI predictor: baseline + tactical adjustments + scorelines, `--save` logs to `predictions/`
-- `src/server.mjs` + `public/index.html` — personal web dashboard (`npm run serve` → http://localhost:3026): team picker, tactical sliders, save predictions, enter actual results, hit/miss tracking
-- `src/api-football.mjs` — fixtures / lineups / injuries from API-Football (key in `.env`)
+- `src/model.mjs` — shared math: Dixon-Coles grid, style multipliers (-2..+2 per team, attacking/defensive), corners heuristic, clamping
+- `src/form.mjs` — last-5 form (overall/home/away) + head-to-head from engine's 920-match results.json
+- `src/predict.mjs` — CLI predictor: baseline + manual lambda multipliers (the analyst-agent path)
+- `src/server.mjs` + `public/index.html` — match-center UI (`npm run serve` → http://localhost:3026): formation pitches with editable XIs (persisted in localStorage per team), tactical approach segments, form/H2H intel, corners, save/log/hit-miss. Lineup import per fixture id needs the API key.
+- `src/apifb.mjs` — shared API-Football client; `src/api-football.mjs` — CLI for fixtures/lineups/injuries (key in `.env`)
 - `dossiers/` — one style dossier per team (see TEMPLATE.md)
 - `prompts/tactical-analyst.md` — THE WORKFLOW. Read this when asked to analyze/predict a match.
 - `adjustments/` — analyst output JSONs, one per match
