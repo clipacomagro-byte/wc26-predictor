@@ -3,8 +3,9 @@
 //   node src/server.mjs            → http://localhost:3026
 import { createServer } from "node:http";
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
-import { ratings, predictFromLambdas, clampAdjust, baseLambdas, styleMultipliers, cornersEstimate } from "./model.mjs";
+import { ratings, predictFromLambdas, clampAdjust, baseLambdas, manualStyle, combineStyles, cornersEstimate } from "./model.mjs";
 import { intel } from "./form.mjs";
+import { teamDna } from "./teamdna.mjs";
 import { api, cache } from "./apifb.mjs";
 
 const PORT = process.env.PORT || 3026;
@@ -25,18 +26,26 @@ function json(res, status, data) {
 function computePrediction(q) {
   const teamA = q.get("a"), teamB = q.get("b");
   const home = q.get("home") || null;
-  const styleA = parseInt(q.get("sa") ?? "0", 10) || 0;
-  const styleB = parseInt(q.get("sb") ?? "0", 10) || 0;
+  // "auto" (default) = data-detected team DNA; -2..2 = manual what-if override
+  const sa = q.get("sa") ?? "auto", sb = q.get("sb") ?? "auto";
   const fineA = clampAdjust(parseFloat(q.get("la") ?? "1"));
   const fineB = clampAdjust(parseFloat(q.get("lb") ?? "1"));
   const base = baseLambdas(teamA, teamB, home);
-  const style = styleMultipliers(styleA, styleB);
-  const mA = style.mA * fineA, mB = style.mB * fineB;
+  const dnaA = teamDna(teamA), dnaB = teamDna(teamB);
+  const styleObjA = sa === "auto" ? dnaA : manualStyle(parseInt(sa, 10) || 0);
+  const styleObjB = sb === "auto" ? dnaB : manualStyle(parseInt(sb, 10) || 0);
+  const combined = combineStyles(styleObjA, styleObjB);
+  const mA = combined.mA * fineA, mB = combined.mB * fineB;
   const baseline = predictFromLambdas(base.lambda, base.mu);
   const adjusted = (mA !== 1 || mB !== 1) ? predictFromLambdas(base.lambda * mA, base.mu * mB) : null;
   const f = adjusted ?? baseline;
-  const corners = cornersEstimate(f.lambda, f.mu, styleA, styleB);
-  return { teamA, teamB, home, eloA: base.ra, eloB: base.rb, styleA, styleB, mA, mB, baseline, adjusted, corners };
+  // corners heuristic wants a -2..2 "approach" — derive it from the attack multiplier
+  const pseudo = (st) => Math.max(-2, Math.min(2, Math.round((st.attack - 1) / 0.05)));
+  const corners = cornersEstimate(f.lambda, f.mu, pseudo(styleObjA), pseudo(styleObjB));
+  return {
+    teamA, teamB, home, eloA: base.ra, eloB: base.rb,
+    styleA: sa, styleB: sb, dnaA, dnaB, mA, mB, baseline, adjusted, corners,
+  };
 }
 
 const server = createServer(async (req, res) => {
@@ -80,7 +89,7 @@ const server = createServer(async (req, res) => {
       for await (const chunk of req) body += chunk;
       const b = JSON.parse(body);
       const p = computePrediction(new URLSearchParams({
-        a: b.teamA, b: b.teamB, home: b.home ?? "", sa: b.styleA ?? 0, sb: b.styleB ?? 0,
+        a: b.teamA, b: b.teamB, home: b.home ?? "", sa: String(b.styleA ?? "auto"), sb: String(b.styleB ?? "auto"),
       }));
       mkdirSync(PREDICTIONS, { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -89,7 +98,7 @@ const server = createServer(async (req, res) => {
         date: new Date().toISOString(),
         teamA: b.teamA, teamB: b.teamB, home: b.home ?? null,
         eloA: p.eloA, eloB: p.eloB,
-        styleA: p.styleA, styleB: p.styleB, mA: p.mA, mB: p.mB,
+        styleA: p.styleA, styleB: p.styleB, dnaA: p.dnaA, dnaB: p.dnaB, mA: p.mA, mB: p.mB,
         formationA: b.formationA ?? null, formationB: b.formationB ?? null,
         lineupA: b.lineupA ?? null, lineupB: b.lineupB ?? null,
         baseline: p.baseline, adjusted: p.adjusted, corners: p.corners,

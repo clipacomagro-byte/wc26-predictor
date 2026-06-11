@@ -47,20 +47,22 @@ export function clampAdjust(x) {
   return Math.max(ADJUST_MIN, Math.min(ADJUST_MAX, x));
 }
 
-// Tactical approach: -2 (very defensive) … 0 (balanced) … +2 (very attacking).
-// An attacking setup raises your own expected goals but also opens space for the
-// opponent; a defensive one suppresses both. Asymmetric on purpose — parking the
-// bus cuts what you concede more than what you score is NOT true at this level,
-// so suppression is weaker than creation.
-export function styleMultipliers(styleA, styleB) {
-  const sA = Math.max(-2, Math.min(2, styleA | 0));
-  const sB = Math.max(-2, Math.min(2, styleB | 0));
-  const own = (s) => 1 + 0.05 * s;       // your approach on your own goals
-  const given = (s) => 1 + 0.035 * s;    // your approach on goals you concede
-  const clampTotal = (x) => Math.max(0.8, Math.min(1.2, x));
+// A team's style is a pair of lambda multipliers: `attack` scales what they score,
+// `leak` scales what they concede (both vs Elo expectation, ~1.0 = neutral).
+// Auto mode gets these from teamDna(); manual override maps the -2..+2 approach
+// to the same shape: an attacking setup raises your goals AND what you concede.
+export function manualStyle(s) {
+  const v = Math.max(-2, Math.min(2, s | 0));
+  return { attack: 1 + 0.05 * v, leak: 1 + 0.035 * v };
+}
+
+// Combine two team styles into per-side lambda multipliers:
+// what A scores = A's attack tendency × B's leak tendency.
+export function combineStyles(styleA, styleB) {
+  const clampTotal = (x) => Math.max(0.8, Math.min(1.25, x));
   return {
-    mA: clampTotal(own(sA) * given(sB)),  // multiplier on team A's lambda
-    mB: clampTotal(own(sB) * given(sA)),  // multiplier on team B's lambda
+    mA: clampTotal(styleA.attack * styleB.leak),
+    mB: clampTotal(styleB.attack * styleA.leak),
   };
 }
 

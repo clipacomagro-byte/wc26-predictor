@@ -250,9 +250,9 @@ const $ = (id) => document.getElementById(id);
 const pct = (x) => (x * 100).toFixed(1) + "%";
 const pct0 = (x) => (x * 100).toFixed(0) + "%";
 const cap = (s) => String(s).split("-").map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(" ");
-const STYLE_NAMES = { "-2": "VERY DEFENSIVE", "-1": "DEFENSIVE", "0": "BALANCED", "1": "ATTACKING", "2": "VERY ATTACKING" };
-const STYLE_ICONS = ["🛡🛡", "🛡", "⚖", "⚔", "⚔⚔"];
-let styles = { A: 0, B: 0 };
+const STYLE_NAMES = { "-2": "VERY DEFENSIVE", "-1": "DEFENSIVE", "0": "BALANCED", "1": "ATTACKING", "2": "VERY ATTACKING", "auto": "AUTO" };
+const STYLE_ICONS = { "-2": "🛡🛡", "-1": "🛡", "0": "⚖", "1": "⚔", "2": "⚔⚔", "auto": "🧬" };
+let styles = { A: "auto", B: "auto" };
 let debounce = null;
 let pool = { A: [], B: [] };       // player arrays per side
 let poolMap = { A: {}, B: {} };    // name → player
@@ -436,19 +436,30 @@ function restoreLineup(side) {
 function buildSeg(side) {
   const seg = $("seg" + side);
   seg.innerHTML = "";
-  for (let v = -2; v <= 2; v++) {
+  for (const v of ["auto", "-2", "-1", "0", "1", "2"]) {
     const b = document.createElement("button");
-    b.textContent = STYLE_ICONS[v + 2];
-    b.title = STYLE_NAMES[v];
+    b.textContent = STYLE_ICONS[v];
+    b.title = v === "auto" ? "Auto — detected from real results" : STYLE_NAMES[v] + " (what-if override)";
     b.dataset.v = v;
-    if (v === styles[side]) b.classList.add("on");
+    if (v === String(styles[side])) b.classList.add("on");
     b.addEventListener("click", () => {
-      styles[side] = v;
-      $("styleName" + side).textContent = STYLE_NAMES[v];
+      styles[side] = v === "auto" ? "auto" : parseInt(v, 10);
       for (const x of seg.children) x.classList.toggle("on", x === b);
       refresh();
     });
     seg.appendChild(b);
+  }
+}
+
+// styleName line under the segments: detected DNA in auto, override name otherwise
+function describeStyle(side, dna) {
+  const el = $("styleName" + side);
+  if (styles[side] === "auto") {
+    const fmt = (x) => (x >= 1 ? "+" : "") + ((x - 1) * 100).toFixed(0) + "%";
+    el.innerHTML = `🧬 ${dna.label.toUpperCase()}<br>` +
+      `<span style="color:var(--dim)">scores ${fmt(dna.attack)} · concedes ${fmt(dna.leak)} vs Elo exp. (${dna.n} games)</span>`;
+  } else {
+    el.textContent = STYLE_NAMES[styles[side]] + " (override)";
   }
 }
 
@@ -461,8 +472,10 @@ async function refresh() {
   const d = await (await fetch("/api/predict?" + q)).json();
   if (d.error) { $("title").textContent = d.error; return; }
   const f = d.adjusted ?? d.baseline;
+  describeStyle("A", d.dnaA); describeStyle("B", d.dnaB);
+  const styleTxt = (s, dna) => s === "auto" ? dna.label : STYLE_NAMES[s].toLowerCase();
   $("title").innerHTML = `${cap(d.teamA)} <span class="elo">${d.eloA}</span> &nbsp;v&nbsp; ${cap(d.teamB)} <span class="elo">${d.eloB}</span>` +
-    `<div class="elo">${d.home ? cap(d.home) + " at home" : "neutral venue"} · ${STYLE_NAMES[styles.A].toLowerCase()} v ${STYLE_NAMES[styles.B].toLowerCase()}</div>`;
+    `<div class="elo">${d.home ? cap(d.home) + " at home" : "neutral venue"} · ${styleTxt(styles.A, d.dnaA)} v ${styleTxt(styles.B, d.dnaB)}</div>`;
   const rows = [
     ["winA", cap(d.teamA), f.winA, d.baseline.winA],
     ["draw", "Draw", f.draw, d.baseline.draw],
@@ -567,7 +580,7 @@ async function loadLog() {
       const predOut = f.winA >= f.draw && f.winA >= f.winB ? "winA" : f.winB >= f.draw ? "winB" : "draw";
       result = `<span class="${out === predOut ? "hit" : "miss"}">${out === predOut ? "✓ hit" : "✗ miss"}</span>`;
     }
-    const setup = (l.styleA !== undefined) ? `${l.formationA ?? "?"} ${STYLE_ICONS[(l.styleA ?? 0) + 2]} v ${STYLE_ICONS[(l.styleB ?? 0) + 2]} ${l.formationB ?? "?"}` : "—";
+    const setup = (l.styleA !== undefined) ? `${l.formationA ?? "?"} ${STYLE_ICONS[String(l.styleA ?? "auto")] ?? "?"} v ${STYLE_ICONS[String(l.styleB ?? "auto")] ?? "?"} ${l.formationB ?? "?"}` : "—";
     const actualCell = l.actual
       ? `${l.actual.goalsA}-${l.actual.goalsB}`
       : `<input class="actualIn" id="ga_${l.file}" type="number" min="0"> – <input class="actualIn" id="gb_${l.file}" type="number" min="0">

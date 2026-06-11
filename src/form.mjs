@@ -1,18 +1,21 @@
 // Form & head-to-head intel from engine/data/results.json (920 internationals 2023-2026).
 import { readFileSync } from "node:fs";
+import { sideSlug } from "./slugs.mjs";
 
 const { matches } = JSON.parse(
   readFileSync(new URL("../engine/data/results.json", import.meta.url), "utf8")
 );
-// newest first
-const sorted = [...matches].sort((a, b) => b.ts - a.ts);
+// newest first, with reliable slugs resolved once
+const sorted = [...matches]
+  .map(m => ({ ...m, homeSlug: sideSlug(m, "home"), awaySlug: sideSlug(m, "away") }))
+  .sort((a, b) => b.ts - a.ts);
 
 function rowFor(m, team) {
   const isHome = m.homeSlug === team;
   const gf = isHome ? m.hg : m.ag, ga = isHome ? m.ag : m.hg;
   return {
     date: m.date,
-    opponent: isHome ? (m.awaySlug ?? m.awayName) : (m.homeSlug ?? m.homeName),
+    opponent: isHome ? m.awaySlug : m.homeSlug,
     opponentName: isHome ? m.awayName : m.homeName,
     venue: isHome ? "H" : "A",
     gf, ga,
