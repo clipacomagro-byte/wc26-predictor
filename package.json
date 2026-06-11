@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "predict": "node src/predict.mjs",
-    "fixtures": "node src/api-football.mjs fixtures"
+    "fixtures": "node src/api-football.mjs fixtures",
+    "serve": "node src/server.mjs"
   },
   "engines": { "node": ">=18" }
 }

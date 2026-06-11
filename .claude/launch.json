@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wc26-dashboard",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["src/server.mjs"],
+      "cwd": "C:\\Users\\Dan\\wc26-predictor",
+      "port": 3026
+    }
+  ]
+}

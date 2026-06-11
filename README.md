@@ -18,6 +18,7 @@ Node 18+, no npm dependencies.
 ## Use
 
 ```bash
+npm run serve                                      # dashboard → http://localhost:3026
 node src/predict.mjs spain germany                 # baseline prediction
 node src/api-football.mjs fixtures 2026-06-14      # find fixture IDs
 node src/api-football.mjs lineups <fixtureId>      # confirmed XI

@@ -7,7 +7,9 @@ MIT) plus a bounded tactical-adjustment layer driven by Claude as analyst.
 ## Layout
 
 - `engine/` — upstream statistical model (separate git clone; don't edit, `git pull` for updates)
-- `src/predict.mjs` — our predictor: baseline + tactical adjustments + scorelines, `--save` logs to `predictions/`
+- `src/model.mjs` — shared prediction math (Dixon-Coles grid, adjustment clamping)
+- `src/predict.mjs` — CLI predictor: baseline + tactical adjustments + scorelines, `--save` logs to `predictions/`
+- `src/server.mjs` + `public/index.html` — personal web dashboard (`npm run serve` → http://localhost:3026): team picker, tactical sliders, save predictions, enter actual results, hit/miss tracking
 - `src/api-football.mjs` — fixtures / lineups / injuries from API-Football (key in `.env`)
 - `dossiers/` — one style dossier per team (see TEMPLATE.md)
 - `prompts/tactical-analyst.md` — THE WORKFLOW. Read this when asked to analyze/predict a match.
