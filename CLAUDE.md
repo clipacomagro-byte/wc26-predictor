@@ -9,6 +9,7 @@ MIT) plus a bounded tactical-adjustment layer driven by Claude as analyst.
 - `engine/` — upstream statistical model (separate git clone; don't edit, `git pull` for updates)
 - `src/model.mjs` — shared math: Dixon-Coles grid, style multipliers (-2..+2 per team, attacking/defensive), corners heuristic, clamping
 - `src/form.mjs` — last-5 form (overall/home/away) + head-to-head from engine's 920-match results.json
+- `src/build-players.mjs` → `data/players.json` — EA FC 26 player DB (2040 players, 54 nations, ratings/positions/clubs/faces) from EAFC26-DataHub CSV in `data-cache/`; rebuild with `node src/build-players.mjs` (restart server after — it caches the JSON)
 - `src/predict.mjs` — CLI predictor: baseline + manual lambda multipliers (the analyst-agent path)
 - `src/server.mjs` + `public/index.html` — match-center UI (`npm run serve` → http://localhost:3026): formation pitches with editable XIs (persisted in localStorage per team), tactical approach segments, form/H2H intel, corners, save/log/hit-miss. Lineup import per fixture id needs the API key.
 - `src/apifb.mjs` — shared API-Football client; `src/api-football.mjs` — CLI for fixtures/lineups/injuries (key in `.env`)

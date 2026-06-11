@@ -63,6 +63,36 @@
   .chip .pos { font-size: 9px; color: rgba(255,255,255,.75); letter-spacing: 1px; text-shadow: 0 1px 2px #000; }
   .loadRow { display: flex; gap: 6px; margin-top: 10px; }
   .loadRow input { flex: 1; }
+  .chip .ovr {
+    position: absolute; top: 8px; right: -7px; min-width: 19px; height: 17px; line-height: 17px;
+    border-radius: 5px; font-size: 10px; font-weight: 800; color: #1a1408; padding: 0 2px;
+    background: #9aa4b2; display: none;
+  }
+  .chip .ovr.gold { background: linear-gradient(180deg, #f5d77a, #c9a13b); }
+  .chip .ovr.silver { background: linear-gradient(180deg, #d9dee5, #9aa4b2); }
+  .chip .ovr.bronze { background: linear-gradient(180deg, #d9a06b, #a06536); }
+
+  /* FIFA-style player card */
+  #pcard {
+    position: fixed; z-index: 50; width: 230px; display: none; pointer-events: none;
+    border-radius: 12px; padding: 12px; border: 1px solid #5a4a1e;
+    background: linear-gradient(160deg, #2b2410 0%, #171309 60%, #0d0b06 100%);
+    box-shadow: 0 10px 30px rgba(0,0,0,.6);
+  }
+  #pcard.silver { border-color: #4a5462; background: linear-gradient(160deg, #232a33 0%, #12161c 60%, #0a0d11 100%); }
+  #pcard .top { display: flex; gap: 10px; align-items: center; }
+  #pcard img { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 2px 4px #000); }
+  #pcard .big { font-size: 30px; font-weight: 900; color: var(--gold); line-height: 1; }
+  #pcard.silver .big { color: #d9dee5; }
+  #pcard .pos { font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+  #pcard .nm { font-weight: 700; font-size: 14px; margin-top: 2px; }
+  #pcard .meta { font-size: 10.5px; color: var(--dim); margin: 6px 0 8px; }
+  #pcard .sgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; }
+  #pcard .srow { display: flex; align-items: center; gap: 5px; font-size: 10.5px; }
+  #pcard .srow .k { width: 26px; color: var(--dim); font-weight: 700; }
+  #pcard .srow .v { width: 18px; text-align: right; font-weight: 800; }
+  #pcard .srow .t { flex: 1; height: 4px; background: #00000066; border-radius: 2px; overflow: hidden; }
+  #pcard .srow .f { height: 100%; border-radius: 2px; }
   .btn { background: #0a1018; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 12px; white-space: nowrap; }
   .btn:hover { border-color: var(--accent); }
 
@@ -152,9 +182,11 @@
       </select>
       <div class="pitch" id="pitchA"></div>
       <div class="loadRow">
+        <button class="btn" id="autoA">⭐ Auto XI</button>
         <input type="text" id="fixtureA" placeholder="fixture id">
         <button class="btn" id="loadA">Load XI</button>
       </div>
+      <datalist id="dlA"></datalist>
     </div>
 
     <!-- CENTER -->
@@ -188,9 +220,11 @@
       </select>
       <div class="pitch" id="pitchB"></div>
       <div class="loadRow">
+        <button class="btn" id="autoB">⭐ Auto XI</button>
         <input type="text" id="fixtureB" placeholder="fixture id">
         <button class="btn" id="loadB">Load XI</button>
       </div>
+      <datalist id="dlB"></datalist>
     </div>
   </div>
 
@@ -209,6 +243,7 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="pcard"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -219,6 +254,104 @@ const STYLE_NAMES = { "-2": "VERY DEFENSIVE", "-1": "DEFENSIVE", "0": "BALANCED"
 const STYLE_ICONS = ["🛡🛡", "🛡", "⚖", "⚔", "⚔⚔"];
 let styles = { A: 0, B: 0 };
 let debounce = null;
+let pool = { A: [], B: [] };       // player arrays per side
+let poolMap = { A: {}, B: {} };    // name → player
+
+/* ---------- player database ---------- */
+async function loadPool(side) {
+  const team = $("team" + side).value;
+  pool[side] = await (await fetch(`/api/players?team=${team}`)).json();
+  poolMap[side] = Object.fromEntries(pool[side].map(p => [p.name, p]));
+  $("dl" + side).innerHTML = pool[side].map(p =>
+    `<option value="${p.name.replace(/"/g, "&quot;")}" label="${p.ovr} · ${p.positions[0]} · ${p.club ?? "—"}"></option>`).join("");
+  refreshBadges(side);
+}
+
+function ovrClass(ovr) { return ovr >= 80 ? "gold" : ovr >= 73 ? "silver" : "bronze"; }
+
+function refreshBadges(side) {
+  for (const chip of $("pitch" + side).querySelectorAll(".chip")) {
+    const inp = chip.querySelector("input");
+    const badge = chip.querySelector(".ovr");
+    const p = poolMap[side][inp.value.trim()];
+    if (p) { badge.textContent = p.ovr; badge.className = "ovr " + ovrClass(p.ovr); badge.style.display = "block"; }
+    else badge.style.display = "none";
+  }
+}
+
+/* hover card */
+const STAT_COLOR = (v) => v >= 85 ? "#34d399" : v >= 75 ? "#a3e635" : v >= 65 ? "#fbbf24" : "#f87171";
+function showCard(p, x, y) {
+  const card = $("pcard");
+  card.className = p.ovr >= 80 ? "" : "silver";
+  card.innerHTML = `
+    <div class="top">
+      ${p.face ? `<img src="${p.face}" onerror="this.style.display='none'">` : ""}
+      <div>
+        <div class="big">${p.ovr}</div>
+        <div class="pos">${p.positions.join(" · ")}</div>
+        <div class="nm">${p.name}</div>
+      </div>
+    </div>
+    <div class="meta">${p.club ?? "no club"} · age ${p.age} · ${p.height}cm · ${p.foot ?? "?"} foot · pot ${p.pot}</div>
+    <div class="sgrid">${Object.entries(p.stats).filter(([, v]) => v != null).map(([k, v]) => `
+      <div class="srow"><span class="k">${k}</span><span class="t"><span class="f" style="width:${v}%;background:${STAT_COLOR(v)}"></span></span><span class="v" style="color:${STAT_COLOR(v)}">${v}</span></div>`).join("")}
+    </div>`;
+  card.style.display = "block";
+  const r = card.getBoundingClientRect();
+  card.style.left = Math.min(x + 14, innerWidth - r.width - 10) + "px";
+  card.style.top = Math.min(Math.max(y - r.height / 2, 8), innerHeight - r.height - 8) + "px";
+}
+function hideCard() { $("pcard").style.display = "none"; }
+
+function bindHover(side) {
+  const pitch = $("pitch" + side);
+  pitch.addEventListener("mouseover", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    const p = poolMap[side][chip.querySelector("input").value.trim()];
+    if (p) showCard(p, e.clientX, e.clientY);
+  });
+  pitch.addEventListener("mousemove", (e) => {
+    if ($("pcard").style.display === "block" && e.target.closest(".chip")) {
+      const p = poolMap[side][e.target.closest(".chip").querySelector("input").value.trim()];
+      if (p) showCard(p, e.clientX, e.clientY);
+    }
+  });
+  pitch.addEventListener("mouseout", (e) => { if (!e.relatedTarget?.closest?.(".chip")) hideCard(); });
+}
+
+/* auto XI: greedy best-rated per slot position */
+const SLOT_FITS = {
+  GK: ["GK"], CB: ["CB"], LB: ["LB", "LWB"], RB: ["RB", "RWB"],
+  LWB: ["LWB", "LB", "LM"], RWB: ["RWB", "RB", "RM"],
+  CM: ["CM", "CDM", "CAM"], LM: ["LM", "LW", "CM"], RM: ["RM", "RW", "CM"],
+  LW: ["LW", "LM", "CF", "ST"], RW: ["RW", "RM", "CF", "ST"], ST: ["ST", "CF", "LW", "RW"],
+};
+function autoXI(side) {
+  const chips = [...$("pitch" + side).querySelectorAll(".chip")];
+  const used = new Set();
+  const picks = new Array(chips.length).fill(null);
+  // pass 1: walk each slot's fit list in priority order — a natural LB beats a
+  // converted LM for the LB slot even at lower rating
+  chips.forEach((chip, i) => {
+    const slot = chip.querySelector(".pos").textContent;
+    for (const fitPos of SLOT_FITS[slot] ?? []) {
+      const p = pool[side].find(p => !used.has(p) && p.positions.includes(fitPos));
+      if (p) { picks[i] = p; used.add(p); break; }
+    }
+  });
+  // pass 2: fill gaps with best remaining (never a GK outfield, never an outfielder in goal)
+  chips.forEach((chip, i) => {
+    if (picks[i]) return;
+    const slot = chip.querySelector(".pos").textContent;
+    const p = pool[side].find(p => !used.has(p) && (slot === "GK") === (p.positions[0] === "GK"));
+    if (p) { picks[i] = p; used.add(p); }
+  });
+  setPlayers(side, picks.map(p => p?.name ?? ""));
+  refreshBadges(side);
+  toast(`Best XI picked for ${cap($("team" + side).value)} (FC26 ratings)`);
+}
 
 /* ---------- pitch ---------- */
 const PITCH_SVG = `<svg viewBox="0 0 300 400" preserveAspectRatio="none">
@@ -264,10 +397,14 @@ function renderPitch(side) {
     const div = document.createElement("div");
     div.className = "chip";
     div.style.left = s.x + "%"; div.style.top = s.y + "%";
-    div.innerHTML = `<div class="pos">${s.pos}</div><input data-slot="${i}" placeholder="${s.pos}" value="${old[i] ?? ""}">`;
+    div.innerHTML = `<div class="pos">${s.pos}</div><input data-slot="${i}" placeholder="${s.pos}" list="dl${side}" value="${old[i] ?? ""}"><span class="ovr"></span>`;
     pitch.appendChild(div);
   });
-  for (const inp of pitch.querySelectorAll("input")) inp.addEventListener("change", () => persistLineup(side));
+  for (const inp of pitch.querySelectorAll("input")) {
+    inp.addEventListener("change", () => { persistLineup(side); refreshBadges(side); });
+    inp.addEventListener("input", () => refreshBadges(side));
+  }
+  refreshBadges(side);
 }
 
 function getPlayers(side) {
@@ -277,6 +414,7 @@ function setPlayers(side, names) {
   const inputs = [...$("pitch" + side).querySelectorAll("input")];
   inputs.forEach((inp, i) => inp.value = names[i] ?? "");
   persistLineup(side);
+  refreshBadges(side);
 }
 function persistLineup(side) {
   const team = $("team" + side).value;
@@ -472,8 +610,11 @@ async function init() {
   $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "A";
   buildSeg("A"); buildSeg("B");
   restoreLineup("A"); restoreLineup("B");
+  await Promise.all([loadPool("A"), loadPool("B")]);
+  bindHover("A"); bindHover("B");
   for (const id of ["teamA", "teamB"]) $(id).addEventListener("change", () => {
-    restoreLineup(id === "teamA" ? "A" : "B"); refresh(); loadIntel();
+    const side = id === "teamA" ? "A" : "B";
+    restoreLineup(side); loadPool(side); refresh(); loadIntel();
   });
   $("venue").addEventListener("change", refresh);
   $("formationA").addEventListener("change", () => { renderPitch("A"); persistLineup("A"); });
@@ -481,6 +622,8 @@ async function init() {
   $("saveBtn").addEventListener("click", savePrediction);
   $("loadA").addEventListener("click", () => loadXI("A"));
   $("loadB").addEventListener("click", () => loadXI("B"));
+  $("autoA").addEventListener("click", () => autoXI("A"));
+  $("autoB").addEventListener("click", () => autoXI("B"));
   $("log").addEventListener("click", (e) => { if (e.target.dataset?.file) setActual(e.target.dataset.file); });
   refresh(); loadIntel(); loadLog();
 }

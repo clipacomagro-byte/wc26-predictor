@@ -10,6 +10,12 @@ import { api, cache } from "./apifb.mjs";
 const PORT = process.env.PORT || 3026;
 const PUBLIC = new URL("../public/", import.meta.url);
 const PREDICTIONS = new URL("../predictions/", import.meta.url);
+const PLAYERS_FILE = new URL("../data/players.json", import.meta.url);
+let playersDb = null;
+function players(team) {
+  playersDb ??= JSON.parse(readFileSync(PLAYERS_FILE, "utf8"));
+  return playersDb.nations[team] ?? [];
+}
 
 function json(res, status, data) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -43,6 +49,8 @@ const server = createServer(async (req, res) => {
       json(res, 200, Object.entries(ratings).sort((a, b) => b[1] - a[1]).map(([name, elo]) => ({ name, elo })));
     } else if (url.pathname === "/api/predict") {
       json(res, 200, computePrediction(url.searchParams));
+    } else if (url.pathname === "/api/players") {
+      json(res, 200, players(url.searchParams.get("team")));
     } else if (url.pathname === "/api/intel") {
       json(res, 200, intel(url.searchParams.get("a"), url.searchParams.get("b")));
     } else if (url.pathname === "/api/fixtures") {
