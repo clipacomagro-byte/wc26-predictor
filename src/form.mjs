@@ -1,10 +1,7 @@
-// Form & head-to-head intel from engine/data/results.json (920 internationals 2023-2026).
-import { readFileSync } from "node:fs";
+// Form & head-to-head intel from the merged results dataset (engine base +
+// Sportradar updates via src/update-results.mjs).
 import { sideSlug } from "./slugs.mjs";
-
-const { matches } = JSON.parse(
-  readFileSync(new URL("../engine/data/results.json", import.meta.url), "utf8")
-);
+import { matches } from "./results.mjs";
 // newest first, with reliable slugs resolved once
 const sorted = [...matches]
   .map(m => ({ ...m, homeSlug: sideSlug(m, "home"), awaySlug: sideSlug(m, "away") }))

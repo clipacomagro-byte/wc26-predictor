@@ -53,7 +53,7 @@ const recency = (tsSec, nowSec) => Math.pow(0.5, ((nowSec - tsSec) / (30.44 * 86
 const expectedScore = (a, b, hb) => 1 / (1 + Math.pow(10, (b - (a + hb)) / 400));
 const gMult = (gd) => { const d = Math.abs(gd); return d <= 1 ? 1 : d === 2 ? 1.5 : (11 + d) / 8; };
 
-const { matches } = JSON.parse(readFileSync(new URL("../engine/data/results.json", import.meta.url), "utf8"));
+const { matches } = await import("./results.mjs");
 const nowSec = matches[matches.length - 1].ts;
 
 const R = {};

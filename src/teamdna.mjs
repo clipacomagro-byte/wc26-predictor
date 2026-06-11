@@ -9,10 +9,10 @@
 // Approximation: current calibrated Elo stands in for historical Elo (drifts
 // are small over the 2-year window). Unrated opponents get a 1500 default.
 // Low samples shrink toward 1.0 via a pseudo-match prior.
-import { readFileSync } from "node:fs";
 import { ratings } from "./model.mjs";
 import { expectedGoals } from "../engine/elo.mjs";
 import { sideSlug } from "./slugs.mjs";
+import { matches } from "./results.mjs";
 
 const HOME_BONUS = 75;
 const DEFAULT_ELO = 1500;
@@ -20,9 +20,6 @@ const HALF_LIFE_DAYS = 365;     // recent matches count more
 const PRIOR_WEIGHT = 6;         // pseudo-matches at ratio 1.0
 const CLAMP = [0.85, 1.18];
 
-const { matches } = JSON.parse(
-  readFileSync(new URL("../engine/data/results.json", import.meta.url), "utf8")
-);
 const NOW = Math.max(...matches.map(m => m.ts));
 
 const cache = new Map();
