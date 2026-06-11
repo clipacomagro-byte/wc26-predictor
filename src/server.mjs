@@ -108,6 +108,41 @@ function computePrediction(q) {
 
 const HOST_NATIONS = new Set(["usa", "mexico", "canada"]);
 
+// ---- daily data refresh: pull new results from Sportradar, recalibrate Elo,
+// hot-reload everything. ~3 API calls per run. No scraping — API only.
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { reloadResults } from "./results.mjs";
+import { reloadRatings } from "./model.mjs";
+
+function runScript(file) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(process.execPath, [fileURLToPath(new URL(file, import.meta.url))], { stdio: "inherit" });
+    p.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`${file} exited ${code}`)));
+  });
+}
+
+let lastRefresh = null, refreshing = false;
+async function refreshData() {
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    await runScript("./update-results.mjs");
+    await runScript("./build-teams.mjs");
+    reloadResults();
+    reloadRatings();
+    lastRefresh = new Date().toISOString();
+    console.log(`[refresh] data refreshed at ${lastRefresh}`);
+  } catch (e) {
+    console.error("[refresh] failed:", e.message);
+  } finally {
+    refreshing = false;
+  }
+}
+// on boot + every 24h (skipped quietly if no Sportradar key configured)
+refreshData();
+setInterval(refreshData, 24 * 3600 * 1000).unref();
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   try {
@@ -142,6 +177,9 @@ const server = createServer(async (req, res) => {
       const lm = liveModel(f.lambda, f.mu, live.homeScore, live.awayScore, mins);
       const signal = buildSignal(live, lm, pre, q.get("a"), q.get("b"));
       json(res, 200, { live, model: lm, signal, pre: { winA: f.winA, draw: f.draw, winB: f.winB } });
+    } else if (url.pathname === "/api/refresh" && req.method === "POST") {
+      refreshData();
+      json(res, 200, { started: true, lastRefresh });
     } else if (url.pathname === "/api/bracket") {
       json(res, 200, await bracket());
     } else if (url.pathname === "/api/oddsboard") {

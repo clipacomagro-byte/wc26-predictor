@@ -12,7 +12,7 @@
 import { ratings } from "./model.mjs";
 import { expectedGoals } from "../engine/elo.mjs";
 import { sideSlug } from "./slugs.mjs";
-import { matches } from "./results.mjs";
+import { matches, dataVersion } from "./results.mjs";
 
 const HOME_BONUS = 75;
 const DEFAULT_ELO = 1500;
@@ -20,12 +20,12 @@ const HALF_LIFE_DAYS = 365;     // recent matches count more
 const PRIOR_WEIGHT = 6;         // pseudo-matches at ratio 1.0
 const CLAMP = [0.85, 1.18];
 
-const NOW = Math.max(...matches.map(m => m.ts));
-
-const cache = new Map();
+let cache = new Map(), cacheV = -1;
 
 export function teamDna(team) {
+  if (cacheV !== dataVersion) { cache = new Map(); cacheV = dataVersion; }
   if (cache.has(team)) return cache.get(team);
+  const NOW = Math.max(...matches.map(m => m.ts));
   const elo = ratings[team];
   let wSum = 0, gFor = 0, expFor = 0, gAg = 0, expAg = 0, n = 0;
   for (const m of matches) {

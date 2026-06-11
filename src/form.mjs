@@ -1,11 +1,19 @@
-// Form & head-to-head intel from the merged results dataset (engine base +
+﻿// Form & head-to-head intel from the merged results dataset (engine base +
 // Sportradar updates via src/update-results.mjs).
 import { sideSlug } from "./slugs.mjs";
-import { matches } from "./results.mjs";
-// newest first, with reliable slugs resolved once
-const sorted = [...matches]
-  .map(m => ({ ...m, homeSlug: sideSlug(m, "home"), awaySlug: sideSlug(m, "away") }))
-  .sort((a, b) => b.ts - a.ts);
+import { matches, dataVersion } from "./results.mjs";
+
+// newest first, with reliable slugs resolved once; rebuilt when results refresh
+let _sorted = null, _v = -1;
+function sortedMatches() {
+  if (_v !== dataVersion) {
+    _sorted = [...matches]
+      .map(m => ({ ...m, homeSlug: sideSlug(m, "home"), awaySlug: sideSlug(m, "away") }))
+      .sort((a, b) => b.ts - a.ts);
+    _v = dataVersion;
+  }
+  return _sorted;
+}
 
 function rowFor(m, team) {
   const isHome = m.homeSlug === team;
@@ -24,7 +32,7 @@ function rowFor(m, team) {
 // Last n matches for a team. venue: "H" | "A" | null (all).
 export function teamForm(team, { venue = null, n = 5 } = {}) {
   const rows = [];
-  for (const m of sorted) {
+  for (const m of sortedMatches()) {
     if (m.homeSlug !== team && m.awaySlug !== team) continue;
     const r = rowFor(m, team);
     if (venue && r.venue !== venue) continue;
@@ -42,7 +50,7 @@ export function formSummary(rows) {
 
 // All meetings between the two teams in the dataset, newest first.
 export function headToHead(a, b) {
-  return sorted
+  return sortedMatches()
     .filter(m => (m.homeSlug === a && m.awaySlug === b) || (m.homeSlug === b && m.awaySlug === a))
     .map(m => ({ ...rowFor(m, a), perspective: a }));
 }
@@ -54,3 +62,4 @@ export function intel(a, b) {
     h2h: headToHead(a, b),
   };
 }
+

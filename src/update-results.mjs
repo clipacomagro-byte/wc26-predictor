@@ -11,9 +11,13 @@ const PAGE = 100;     // the API caps pages at 100 regardless of limit param
 const MAX_PAGES = 12; // quota guard
 
 function loadKey() {
-  const m = readFileSync(new URL("../.env", import.meta.url), "utf8").match(/^SPORTRADAR_KEY=(.+)$/m);
-  if (!m) { console.error("No SPORTRADAR_KEY in .env"); process.exit(1); }
-  return m[1].trim();
+  if (process.env.SPORTRADAR_KEY) return process.env.SPORTRADAR_KEY;
+  try {
+    const m = readFileSync(new URL("../.env", import.meta.url), "utf8").match(/^SPORTRADAR_KEY=(.+)$/m);
+    if (m) return m[1].trim();
+  } catch {}
+  console.error("No SPORTRADAR_KEY in env or .env");
+  process.exit(1);
 }
 
 const base = JSON.parse(readFileSync(new URL("../engine/data/results.json", import.meta.url), "utf8"));
@@ -22,12 +26,21 @@ const key = loadKey();
 
 const out = [];
 let calls = 0;
+async function fetchPage(url) {
+  // trial is strictly ~1 req/s — back off and retry on 429
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(url);
+    calls++;
+    if (res.status === 429) { await new Promise(r => setTimeout(r, 3000 * (attempt + 1))); continue; }
+    return res;
+  }
+  return null;
+}
 for (const season of SEASONS) {
   for (let page = 0; page < MAX_PAGES; page++) {
     const url = `https://api.sportradar.com/soccer/trial/v4/en/seasons/${season}/summaries.json?api_key=${key}&offset=${page * PAGE}&limit=${PAGE}`;
-    const res = await fetch(url);
-    calls++;
-    if (!res.ok) { console.error(`${season} page ${page}: HTTP ${res.status}`); break; }
+    const res = await fetchPage(url);
+    if (!res || !res.ok) { console.error(`${season} page ${page}: HTTP ${res?.status ?? "429 after retries"}`); break; }
     const { summaries } = await res.json();
     if (!summaries?.length) break;
     for (const s of summaries) {
@@ -53,9 +66,21 @@ for (const season of SEASONS) {
   }
 }
 
-out.sort((a, b) => a.ts - b.ts);
+// merge with whatever we already had — a failed/partial fetch must never wipe
+// previously ingested results
+const EXTRA = new URL("../data/results-extra.json", import.meta.url);
+let existing = [];
+try { existing = JSON.parse(readFileSync(EXTRA, "utf8")).matches; } catch {}
+const seen = new Set();
+const merged = [];
+for (const m of [...existing, ...out]) {
+  const k = `${m.date}|${m.homeName}|${m.awayName}`;
+  if (seen.has(k)) continue;
+  seen.add(k);
+  merged.push(m);
+}
+merged.sort((a, b) => a.ts - b.ts);
 mkdirSync(new URL("../data/", import.meta.url), { recursive: true });
-writeFileSync(new URL("../data/results-extra.json", import.meta.url),
-  JSON.stringify({ fetchedAt: new Date().toISOString(), matches: out }, null, 1));
-console.log(`${out.length} results newer than ${new Date(cutoff * 1000).toISOString().slice(0, 10)} (${calls} API calls)`);
-for (const m of out.slice(-12)) console.log(`  ${m.date}  ${m.homeName} ${m.hg}-${m.ag} ${m.awayName}  [${m.leagueName}]`);
+writeFileSync(EXTRA, JSON.stringify({ fetchedAt: new Date().toISOString(), matches: merged }, null, 1));
+console.log(`${out.length} fetched, ${merged.length} total extra results (${calls} API calls)`);
+for (const m of merged.slice(-8)) console.log(`  ${m.date}  ${m.homeName} ${m.hg}-${m.ag} ${m.awayName}  [${m.leagueName}]`);

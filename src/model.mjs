@@ -10,9 +10,14 @@ const MAX_GOALS = 8;
 // Ratings for the actual 48 qualified teams (built by src/build-teams.mjs —
 // the engine's own elo-calibrated.json predates the playoffs: it still lists
 // Italy & co. and lacks Norway, Turkey, and seven other real qualifiers).
-export const { ratings } = JSON.parse(
-  readFileSync(new URL("../data/teams.json", import.meta.url), "utf8")
-);
+// Mutated in place by reloadRatings() after the daily data refresh.
+export const ratings = {};
+export function reloadRatings() {
+  const fresh = JSON.parse(readFileSync(new URL("../data/teams.json", import.meta.url), "utf8")).ratings;
+  for (const k of Object.keys(ratings)) delete ratings[k];
+  Object.assign(ratings, fresh);
+}
+reloadRatings();
 
 function dcTau(a, b, lambda, mu, rho) {
   if (a === 0 && b === 0) return 1 - lambda * mu * rho;
