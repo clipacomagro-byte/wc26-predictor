@@ -1,0 +1,11 @@
+{
+  "name": "wc26-predictor",
+  "version": "0.1.0",
+  "description": "World Cup 2026 predictor: Elo + Dixon-Coles core with a bounded LLM tactical-adjustment layer",
+  "type": "module",
+  "scripts": {
+    "predict": "node src/predict.mjs",
+    "fixtures": "node src/api-football.mjs fixtures"
+  },
+  "engines": { "node": ">=18" }
+}

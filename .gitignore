@@ -1,0 +1,4 @@
+engine/
+.env
+data-cache/
+node_modules/

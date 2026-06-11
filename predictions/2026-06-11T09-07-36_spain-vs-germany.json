@@ -1,0 +1,79 @@
+{
+  "date": "2026-06-11T09:07:36.896Z",
+  "teamA": "spain",
+  "teamB": "germany",
+  "home": null,
+  "eloA": 2074,
+  "eloB": 1927,
+  "baseline": {
+    "winA": 0.5316238800557609,
+    "draw": 0.2679417548347348,
+    "winB": 0.20043436510950405,
+    "over25": 0.5063368247184578,
+    "btts": 0.5280520283479462,
+    "lambda": 1.7175,
+    "mu": 0.9825000000000002,
+    "topScorelines": [
+      {
+        "score": "1-1",
+        "p": 0.12815828303599888
+      },
+      {
+        "score": "1-0",
+        "p": 0.1006906404874921
+      },
+      {
+        "score": "2-0",
+        "p": 0.09912938868892705
+      },
+      {
+        "score": "2-1",
+        "p": 0.09739462438687085
+      },
+      {
+        "score": "0-0",
+        "p": 0.08195465274975645
+      }
+    ]
+  },
+  "adjusted": {
+    "winA": 0.49401556096441673,
+    "draw": 0.2790943627331935,
+    "winB": 0.2268900763023897,
+    "over25": 0.4930494826715439,
+    "btts": 0.5308530824967549,
+    "lambda": 1.61445,
+    "mu": 1.0316250000000002,
+    "topScorelines": [
+      {
+        "score": "1-1",
+        "p": 0.1334967997674068
+      },
+      {
+        "score": "1-0",
+        "p": 0.0991591168925219
+      },
+      {
+        "score": "2-1",
+        "p": 0.09536456123207519
+      },
+      {
+        "score": "2-0",
+        "p": 0.09244111109373578
+      },
+      {
+        "score": "0-0",
+        "p": 0.08629065113453872
+      }
+    ]
+  },
+  "adjustment": {
+    "match": "spain vs germany",
+    "fixtureId": null,
+    "lineupsConfirmed": false,
+    "lambdaA": 0.94,
+    "lambdaB": 1.05,
+    "reasoning": "EXAMPLE FILE (fabricated): Spain's first-choice left-back suspended, backup struggles vs pace — Germany attacks that flank with Sané. Germany's press disrupts short build-up; Spain's dossier flags no plan B vs high press. Projected XI, not confirmed."
+  },
+  "actual": null
+}
