@@ -166,6 +166,13 @@
       </select>
     </span>
   </header>
+  <div class="card" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <h2 style="margin:0">Fixtures</h2>
+    <select id="matchPicker" style="flex:1;min-width:260px">
+      <option value="">— pick a real World Cup match (Sportradar) —</option>
+    </select>
+    <span class="sub" id="matchInfo"></span>
+  </div>
 
   <div class="layout">
     <!-- TEAM A -->
@@ -183,8 +190,7 @@
       <div class="pitch" id="pitchA"></div>
       <div class="loadRow">
         <button class="btn" id="autoA">⭐ Auto XI</button>
-        <input type="text" id="fixtureA" placeholder="fixture id">
-        <button class="btn" id="loadA">Load XI</button>
+        <button class="btn" id="loadA">📋 Confirmed XI</button>
       </div>
       <datalist id="dlA"></datalist>
     </div>
@@ -221,8 +227,7 @@
       <div class="pitch" id="pitchB"></div>
       <div class="loadRow">
         <button class="btn" id="autoB">⭐ Auto XI</button>
-        <input type="text" id="fixtureB" placeholder="fixture id">
-        <button class="btn" id="loadB">Load XI</button>
+        <button class="btn" id="loadB">📋 Confirmed XI</button>
       </div>
       <datalist id="dlB"></datalist>
     </div>
@@ -532,23 +537,67 @@ async function loadIntel() {
     : `<div class="empty">No meetings since Oct 2023 in the dataset.</div>`;
 }
 
-/* ---------- lineups via API ---------- */
+/* ---------- real fixtures + confirmed lineups (Sportradar) ---------- */
+const HOSTS = new Set(["usa", "mexico", "canada"]);
+let matches = [];
+let currentEvent = null;
+
+async function loadMatches() {
+  matches = await (await fetch("/api/matches")).json();
+  if (matches.error) return toast(matches.error, true);
+  const fmt = (m) => {
+    const d = new Date(m.start);
+    const when = d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const score = m.status === "not_started" ? "" : ` [${m.homeScore ?? ""}-${m.awayScore ?? ""} ${m.status}]`;
+    return `${when} — ${m.homeName} v ${m.awayName}${score}`;
+  };
+  $("matchPicker").innerHTML = `<option value="">— pick a real World Cup match (Sportradar) —</option>` +
+    matches.map((m, i) => `<option value="${i}">${fmt(m)}</option>`).join("");
+  // preselect the next unplayed match
+  const next = matches.findIndex(m => m.status === "not_started");
+  if (next >= 0) { $("matchPicker").value = String(next); applyMatch(matches[next]); }
+}
+
+function applyMatch(m) {
+  currentEvent = m.event;
+  $("teamA").value = m.homeSlug; $("teamA").dispatchEvent(new Event("change"));
+  $("teamB").value = m.awaySlug; $("teamB").dispatchEvent(new Event("change"));
+  $("venue").value = HOSTS.has(m.homeSlug) ? "A" : HOSTS.has(m.awaySlug) ? "B" : "";
+  $("matchInfo").textContent = new Date(m.start).toLocaleString() + (HOSTS.has(m.homeSlug) || HOSTS.has(m.awaySlug) ? " · host nation playing" : " · neutral");
+  refresh(); loadIntel();
+}
+
+// Sportradar names ("Lionel Messi") → FC26 pool names ("L. Messi") so badges/cards work
+function matchToPool(side, fullName) {
+  const parts = fullName.trim().split(/\s+/);
+  const last = parts[parts.length - 1].toLowerCase();
+  const initial = parts[0]?.[0]?.toLowerCase();
+  const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const cands = pool[side].filter(p => norm(p.name).includes(norm(last)) || norm(p.fullName ?? "").includes(norm(last)));
+  if (cands.length === 1) return cands[0].name;
+  const byInitial = cands.find(p => norm(p.name)[0] === initial || norm(p.fullName ?? "")[0] === initial);
+  return byInitial?.name ?? fullName;
+}
+
 async function loadXI(side) {
-  const fixture = $("fixture" + side).value.trim();
-  if (!fixture) return toast("Enter a fixture id (api-football)", true);
-  const d = await (await fetch(`/api/lineups?fixture=${fixture}`)).json();
+  if (!currentEvent) return toast("Pick a match from the Fixtures list first", true);
+  const d = await (await fetch(`/api/lineups?event=${currentEvent}`)).json();
   if (d.error) return toast(d.error, true);
-  if (!d.length) return toast("Lineups not published yet (~1h before KO)", true);
-  const want = cap($("team" + side).value).toLowerCase();
-  const t = d.find(x => x.team.toLowerCase().includes(want.split(" ")[0])) ?? d[side === "A" ? 0 : 1];
+  const want = $("team" + side).value;
+  const t = d.find(x => x.slug === want);
+  if (!t) return toast(`${cap(want)} is not in this fixture`, true);
+  if (!t.starters.length) return toast("Lineups not published yet (~1h before kickoff)", true);
   if (t.formation) {
     const sel = $("formation" + side);
     if (![...sel.options].some(o => o.value === t.formation)) sel.add(new Option(t.formation, t.formation));
     sel.value = t.formation;
     renderPitch(side);
   }
-  setPlayers(side, t.startXI.map(p => p.name));
-  toast(`${t.team} XI loaded (${t.formation})`);
+  // GK first, then defenders/mids/forwards in announced order
+  const order = { goalkeeper: 0, defender: 1, midfielder: 2, forward: 3 };
+  const sorted = [...t.starters].sort((x, y) => (order[x.position?.toLowerCase()] ?? 9) - (order[y.position?.toLowerCase()] ?? 9));
+  setPlayers(side, sorted.map(p => matchToPool(side, p.name)));
+  toast(`${t.team} confirmed XI loaded${t.formation ? ` (${t.formation})` : ""}`);
 }
 
 /* ---------- save & log ---------- */
@@ -637,8 +686,12 @@ async function init() {
   $("loadB").addEventListener("click", () => loadXI("B"));
   $("autoA").addEventListener("click", () => autoXI("A"));
   $("autoB").addEventListener("click", () => autoXI("B"));
+  $("matchPicker").addEventListener("change", () => {
+    const m = matches[$("matchPicker").value];
+    if (m) applyMatch(m);
+  });
   $("log").addEventListener("click", (e) => { if (e.target.dataset?.file) setActual(e.target.dataset.file); });
-  refresh(); loadIntel(); loadLog();
+  refresh(); loadIntel(); loadLog(); loadMatches();
 }
 init();
 </script>

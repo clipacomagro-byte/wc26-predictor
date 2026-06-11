@@ -12,7 +12,11 @@ MIT) plus a bounded tactical-adjustment layer driven by Claude as analyst.
 - `src/build-players.mjs` → `data/players.json` — EA FC 26 player DB (2040 players, 54 nations, ratings/positions/clubs/faces) from EAFC26-DataHub CSV in `data-cache/`; rebuild with `node src/build-players.mjs` (restart server after — it caches the JSON)
 - `src/predict.mjs` — CLI predictor: baseline + manual lambda multipliers (the analyst-agent path)
 - `src/server.mjs` + `public/index.html` — match-center UI (`npm run serve` → http://localhost:3026): formation pitches with editable XIs (persisted in localStorage per team), tactical approach segments, form/H2H intel, corners, save/log/hit-miss. Lineup import per fixture id needs the API key.
-- `src/apifb.mjs` — shared API-Football client; `src/api-football.mjs` — CLI for fixtures/lineups/injuries (key in `.env`)
+- `src/sportradar.mjs` — Sportradar Soccer v4 client (SPORTRADAR_KEY in .env, trial tier ~1 req/s
+  so cache hard). WC2026 season = sr:season:101177. Powers /api/matches (all 104 fixtures,
+  6h-cached) and /api/lineups?event= (confirmed XI ~1h before KO). UI fixture picker auto-selects
+  the next unplayed match and sets host-nation home advantage (usa/mexico/canada).
+- `src/apifb.mjs` — API-Football client (backup feed); `src/api-football.mjs` — its CLI (key optional)
 - `dossiers/` — one style dossier per team (see TEMPLATE.md)
 - `prompts/tactical-analyst.md` — THE WORKFLOW. Read this when asked to analyze/predict a match.
 - `adjustments/` — analyst output JSONs, one per match

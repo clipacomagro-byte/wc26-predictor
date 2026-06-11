@@ -7,6 +7,7 @@ import { ratings, predictFromLambdas, clampAdjust, baseLambdas, manualStyle, com
 import { intel } from "./form.mjs";
 import { teamDna } from "./teamdna.mjs";
 import { api, cache } from "./apifb.mjs";
+import { schedule, lineups as srLineups } from "./sportradar.mjs";
 
 const PORT = process.env.PORT || 3026;
 const PUBLIC = new URL("../public/", import.meta.url);
@@ -71,15 +72,23 @@ const server = createServer(async (req, res) => {
         id: f.fixture.id, date: f.fixture.date,
         home: f.teams.home.name, away: f.teams.away.name, status: f.fixture.status.short,
       })));
+    } else if (url.pathname === "/api/matches") {
+      json(res, 200, await schedule({ force: url.searchParams.get("force") === "1" }));
     } else if (url.pathname === "/api/lineups") {
-      const fixture = url.searchParams.get("fixture");
-      const lineups = await api("/fixtures/lineups", { fixture });
-      cache(`lineups_${fixture}`, lineups);
-      json(res, 200, lineups.map(t => ({
-        team: t.team.name, formation: t.formation, coach: t.coach?.name ?? null,
-        startXI: t.startXI.map(p => ({ name: p.player.name, number: p.player.number, pos: p.player.pos, grid: p.player.grid })),
-        bench: t.substitutes.map(p => p.player.name),
-      })));
+      const event = url.searchParams.get("event");
+      if (event) {
+        json(res, 200, await srLineups(event));
+      } else {
+        // legacy API-Football path (fixture id)
+        const fixture = url.searchParams.get("fixture");
+        const lu = await api("/fixtures/lineups", { fixture });
+        cache(`lineups_${fixture}`, lu);
+        json(res, 200, lu.map(t => ({
+          team: t.team.name, formation: t.formation,
+          starters: t.startXI.map(p => ({ name: p.player.name, number: p.player.number, position: p.player.pos })),
+          bench: t.substitutes.map(p => p.player.name),
+        })));
+      }
     } else if (url.pathname === "/api/predictions") {
       if (!existsSync(PREDICTIONS)) return json(res, 200, []);
       const files = readdirSync(PREDICTIONS).filter(f => f.endsWith(".json")).sort().reverse();
