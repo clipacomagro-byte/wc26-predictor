@@ -597,7 +597,10 @@ function renderPitch(side) {
   const formation = $("formation" + side).value;
   const old = getPlayers(side); // keep typed names across formation changes
   pitch.innerHTML = PITCH_SVG;
-  const rows = formation.split("-").map(Number);
+  let rows = String(formation).split("-").map(Number);
+  if (rows.some(n => !Number.isInteger(n) || n < 1) || rows.reduce((a, b) => a + b, 0) !== 10) {
+    rows = [4, 3, 3]; // defensive fallback for malformed formation strings
+  }
   const slots = [{ x: 50, y: 91, pos: "GK" }];
   rows.forEach((n, r) => {
     const y = 76 - (r + 1) * (62 / (rows.length + 0.4));
@@ -758,7 +761,7 @@ async function loadXI(side, quiet = false) {
   const t = d.find(x => x.slug === want);
   if (!t) return quiet || toast(`${cap(want)} is not in this fixture`, true);
   if (!t.starters.length) return quiet || toast("Lineups not published yet (~1h before kickoff)", true);
-  if (t.formation) {
+  if (t.formation && /^\d+(-\d+)+$/.test(String(t.formation))) {
     const sel = $("formation" + side);
     if (![...sel.options].some(o => o.value === t.formation)) sel.add(new Option(t.formation, t.formation));
     sel.value = t.formation;

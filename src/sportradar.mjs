@@ -106,23 +106,32 @@ export async function timeline(eventId) {
     match_started: "▶", period_start: "▶", break_start: "⏸", match_ended: "🏁",
     injury_time_shown: "⏱", video_assistant_referee: "📺", corner_kick: "🚩",
   };
+  // trial-tier status scores LAG the events feed (seen live: commentary said 1-0
+  // while home_score still read 0) — so count goals from the timeline and trust
+  // whichever is higher. Running score is rebuilt per event for the same reason.
+  let goalsHome = 0, goalsAway = 0;
   const events = (raw.timeline ?? [])
     .filter(e => ICONS[e.type])
-    .map(e => ({
-      minute: e.match_time ?? null,
-      stoppage: e.stoppage_time ?? null,
-      icon: ICONS[e.type],
-      type: e.type,
-      side: e.competitor ?? null, // "home" | "away"
-      text: describeEvent(e),
-      score: e.type === "score_change" ? `${e.home_score}-${e.away_score}` : null,
-    }));
+    .map(e => {
+      if (e.type === "score_change") {
+        if (e.competitor === "home") goalsHome++; else if (e.competitor === "away") goalsAway++;
+      }
+      return {
+        minute: e.match_time ?? null,
+        stoppage: e.stoppage_time ?? null,
+        icon: ICONS[e.type],
+        type: e.type,
+        side: e.competitor ?? null, // "home" | "away"
+        text: describeEvent(e),
+        score: e.type === "score_change" ? `${goalsHome}-${goalsAway}` : null,
+      };
+    });
   return {
     status: st.status ?? "unknown",
     matchStatus: st.match_status ?? null,
     clock: st.clock?.played ?? null,
-    homeScore: st.home_score ?? 0,
-    awayScore: st.away_score ?? 0,
+    homeScore: Math.max(st.home_score ?? 0, goalsHome),
+    awayScore: Math.max(st.away_score ?? 0, goalsAway),
     statsHome: statFor("home"),
     statsAway: statFor("away"),
     events,
@@ -155,7 +164,7 @@ export async function lineups(eventId) {
   return (raw.lineups?.competitors ?? []).map(c => ({
     team: c.name,
     slug: slugForName(c.name),
-    formation: c.formation || null,
+    formation: c.formation?.type ?? (typeof c.formation === "string" ? c.formation : null),
     starters: (c.players ?? []).filter(p => p.starter).map(p => ({
       name: flip(p.name), number: p.jersey_number ?? null, position: p.position ?? null,
     })),
