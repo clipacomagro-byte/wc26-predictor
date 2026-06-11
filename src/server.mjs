@@ -8,6 +8,7 @@ import { intel } from "./form.mjs";
 import { teamDna } from "./teamdna.mjs";
 import { api, cache } from "./apifb.mjs";
 import { schedule, lineups as srLineups, timeline, bracket } from "./sportradar.mjs";
+import { marketOdds } from "./oddsapi.mjs";
 import { expectedScore } from "../engine/elo.mjs";
 import { poissonPmf } from "../engine/elo.mjs";
 
@@ -144,24 +145,46 @@ const server = createServer(async (req, res) => {
     } else if (url.pathname === "/api/bracket") {
       json(res, 200, await bracket());
     } else if (url.pathname === "/api/oddsboard") {
-      // model probabilities + fair odds for every match with known teams
+      // model probabilities + fair odds + bookmaker consensus for every match
       const sched = await schedule();
-      json(res, 200, sched.map(m => {
-        if (ratings[m.homeSlug] == null || ratings[m.awaySlug] == null) {
-          return { ...m, model: null };
-        }
-        const home = HOST_NATIONS.has(m.homeSlug) ? m.homeSlug : HOST_NATIONS.has(m.awaySlug) ? m.awaySlug : "";
-        const p = computePrediction(new URLSearchParams({ a: m.homeSlug, b: m.awaySlug, home }));
-        const f = p.adjusted ?? p.baseline;
-        return {
-          ...m,
-          model: {
-            winA: f.winA, draw: f.draw, winB: f.winB, over25: f.over25,
-            fairA: 1 / f.winA, fairD: 1 / f.draw, fairB: 1 / f.winB,
-            topScore: f.topScorelines[0],
-          },
-        };
-      }));
+      let market = { available: false, events: [] };
+      try { market = await marketOdds({ force: url.searchParams.get("force") === "1" }); }
+      catch (e) { market.reason = e.message; }
+      const findMarket = (m) => market.events.find(o =>
+        o.homeSlug === m.homeSlug && o.awaySlug === m.awaySlug &&
+        Math.abs(new Date(o.commence) - new Date(m.start)) < 36e5 * 6);
+      json(res, 200, {
+        market: { available: market.available, fetchedAt: market.fetchedAt ?? null, remaining: market.remaining ?? null, reason: market.reason ?? null },
+        rows: sched.map(m => {
+          const mk = findMarket(m);
+          if (ratings[m.homeSlug] == null || ratings[m.awaySlug] == null) {
+            return { ...m, model: null, mk: mk ?? null };
+          }
+          const home = HOST_NATIONS.has(m.homeSlug) ? m.homeSlug : HOST_NATIONS.has(m.awaySlug) ? m.awaySlug : "";
+          const p = computePrediction(new URLSearchParams({ a: m.homeSlug, b: m.awaySlug, home }));
+          const f = p.adjusted ?? p.baseline;
+          // divergence flag: model sees ≥8pts more probability than the de-margined
+          // market. NOT betting advice — historically the closing market beats Elo
+          // models; treat flags as "model disagrees here, find out why".
+          let value = null;
+          if (mk?.implied) {
+            const edges = [
+              { side: "1", team: m.homeName, edge: f.winA - mk.implied.home, odds: mk.odds.home },
+              { side: "X", team: "draw", edge: f.draw - mk.implied.draw, odds: mk.odds.draw },
+              { side: "2", team: m.awayName, edge: f.winB - mk.implied.away, odds: mk.odds.away },
+            ].filter(x => x.edge >= 0.08).sort((a, b) => b.edge - a.edge);
+            if (edges.length) value = edges[0];
+          }
+          return {
+            ...m, mk: mk ?? null, value,
+            model: {
+              winA: f.winA, draw: f.draw, winB: f.winB, over25: f.over25,
+              fairA: 1 / f.winA, fairD: 1 / f.draw, fairB: 1 / f.winB,
+              topScore: f.topScorelines[0],
+            },
+          };
+        }),
+      });
     } else if (url.pathname === "/api/matches") {
       json(res, 200, await schedule({ force: url.searchParams.get("force") === "1" }));
     } else if (url.pathname === "/api/lineups") {

@@ -374,9 +374,9 @@
   <!-- ODDS TAB -->
   <div id="tab-odds" style="display:none">
     <div class="card">
-      <h2>All 104 matches — model probabilities &amp; fair odds <span style="text-transform:none;letter-spacing:0">(bookmaker columns light up when ODDS_API_KEY is set)</span></h2>
+      <h2>All 104 matches — model vs bookmaker consensus <span style="text-transform:none;letter-spacing:0" id="oddsMeta"></span></h2>
       <div style="overflow-x:auto"><table class="oddsTable" id="oddsTable"><thead>
-        <tr><th>date</th><th>stage</th><th>match</th><th>1</th><th>X</th><th>2</th><th>fair 1</th><th>fair X</th><th>fair 2</th><th>o2.5</th><th>top score</th><th>result</th></tr>
+        <tr><th>date</th><th>match</th><th colspan="3">model %  (1 / X / 2)</th><th colspan="3">model fair odds</th><th colspan="3">market odds (median)</th><th>o2.5 mdl/mkt</th><th>top score</th><th>value</th><th>result</th></tr>
       </thead><tbody></tbody></table></div>
     </div>
   </div>
@@ -1087,25 +1087,32 @@ async function modelPicksAll() {
 /* ---------- odds board ---------- */
 let oddsLoaded = false;
 async function loadOdds() {
-  const rows = await (await fetch("/api/oddsboard")).json();
-  if (rows.error) return toast(rows.error, true);
+  const d = await (await fetch("/api/oddsboard")).json();
+  if (d.error) return toast(d.error, true);
   oddsLoaded = true;
-  const stage = (m) => m.homeSlug && ratingsKnown(m) ? "Groups" : "KO";
-  const ratingsKnown = (m) => m.model != null;
-  $("oddsTable").querySelector("tbody").innerHTML = rows.map(m => {
+  $("oddsMeta").textContent = d.market.available
+    ? `· market: ${new Date(d.market.fetchedAt).toLocaleTimeString()} · credits left: ${d.market.remaining ?? "?"}`
+    : `· market odds unavailable (${d.market.reason ?? "no key"})`;
+  $("oddsTable").querySelector("tbody").innerHTML = d.rows.map(m => {
     const score = m.status !== "not_started" && m.homeScore != null ? `${m.homeScore}-${m.awayScore}` : "—";
-    if (!m.model) return `<tr><td>${m.start.slice(5, 10)}</td><td><span class="stagePill">KO</span></td>
-      <td style="color:var(--dim)">${m.homeName} v ${m.awayName}</td><td colspan="8" style="color:var(--dim)">teams TBD</td><td>${score}</td></tr>`;
-    const f = m.model;
+    if (!m.model) return `<tr><td>${m.start.slice(5, 10)}</td>
+      <td style="color:var(--dim)">${m.homeName} v ${m.awayName} <span class="stagePill">KO·TBD</span></td><td colspan="12" style="color:var(--dim)">teams TBD</td><td>${score}</td></tr>`;
+    const f = m.model, mk = m.mk;
     const fav = Math.max(f.winA, f.draw, f.winB);
     const c = (x) => `<td class="num ${x === fav ? "fav" : ""}">${(x * 100).toFixed(0)}%</td>`;
+    const o = (x) => `<td class="num">${x != null ? x.toFixed(2) : "—"}</td>`;
+    const valueCell = m.value
+      ? `<td><span style="color:var(--accent);font-weight:700" title="model gives ${m.value.team} ${(m.value.edge * 100).toFixed(0)}pts more than the market">💎 ${m.value.side} @ ${m.value.odds?.toFixed(2) ?? "?"}</span></td>`
+      : `<td style="color:var(--dim)">—</td>`;
     return `<tr>
-      <td>${m.start.slice(5, 10)}</td><td><span class="stagePill">Groups</span></td>
+      <td>${m.start.slice(5, 10)}</td>
       <td>${m.homeName} v ${m.awayName}</td>
       ${c(f.winA)}${c(f.draw)}${c(f.winB)}
       <td class="num">${f.fairA.toFixed(2)}</td><td class="num">${f.fairD.toFixed(2)}</td><td class="num">${f.fairB.toFixed(2)}</td>
-      <td class="num">${(f.over25 * 100).toFixed(0)}%</td>
+      ${o(mk?.odds?.home)}${o(mk?.odds?.draw)}${o(mk?.odds?.away)}
+      <td class="num">${(f.over25 * 100).toFixed(0)}%${mk?.odds?.over25 ? " / " + mk.odds.over25.toFixed(2) : ""}</td>
       <td>${f.topScore.score} (${(f.topScore.p * 100).toFixed(0)}%)</td>
+      ${valueCell}
       <td>${score}</td></tr>`;
   }).join("");
 }
