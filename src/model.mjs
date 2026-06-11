@@ -7,8 +7,11 @@ export const ADJUST_MAX = 1.15;
 export const HOME_BONUS = 75;
 const MAX_GOALS = 8;
 
+// Ratings for the actual 48 qualified teams (built by src/build-teams.mjs —
+// the engine's own elo-calibrated.json predates the playoffs: it still lists
+// Italy & co. and lacks Norway, Turkey, and seven other real qualifiers).
 export const { ratings } = JSON.parse(
-  readFileSync(new URL("../engine/data/elo-calibrated.json", import.meta.url), "utf8")
+  readFileSync(new URL("../data/teams.json", import.meta.url), "utf8")
 );
 
 function dcTau(a, b, lambda, mu, rho) {

@@ -42,6 +42,9 @@ shrink the bounds.
 
 ## Conventions
 
-- Team names: kebab-case, must match keys in `engine/data/elo-calibrated.json`
+- Team names: kebab-case, must match keys in `data/teams.json` (the REAL 48 qualifiers,
+  built by `src/build-teams.mjs` — do NOT use engine/data/elo-calibrated.json directly:
+  it predates the March 2026 playoffs, still lists Italy/Denmark/Poland and lacks
+  Norway/Turkey/Austria/Sweden/Uzbekistan/Iraq/Cape Verde/DR Congo/Curaçao)
 - API-Football: World Cup = league 1, season 2026. Free tier ≈100 req/day — cache hits in
   `data-cache/` are reused, don't refetch needlessly.

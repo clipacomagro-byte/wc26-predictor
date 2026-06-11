@@ -19,6 +19,10 @@ const NATION_MAP = {
   "Trinidad and Tobago": "trinidad-and-tobago",
   "IR Iran": "iran",
   "China PR": "china",
+  "Türkiye": "turkey",
+  "Cabo Verde": "cape-verde", "Cape Verde Islands": "cape-verde",
+  "Congo DR": "dr-congo", "DR Congo": "dr-congo",
+  "Korea DPR": "north-korea",
 };
 const kebab = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const toSlug = (name) => NATION_MAP[name] ?? kebab(name);

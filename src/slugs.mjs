@@ -10,6 +10,9 @@ const SPECIAL = {
   "trinidad-tobago": "trinidad-and-tobago",
   "ir-iran": "iran",
   "republic-of-ireland": "republic-of-ireland", "rep-of-ireland": "republic-of-ireland",
+  "turkiye": "turkey",
+  "cabo-verde": "cape-verde", "cape-verde-islands": "cape-verde",
+  "congo-dr": "dr-congo", "democratic-republic-of-the-congo": "dr-congo", "congo": "dr-congo",
 };
 
 export function slugForName(name) {

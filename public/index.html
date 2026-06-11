@@ -620,7 +620,7 @@ async function init() {
   for (const sel of [$("teamA"), $("teamB")]) {
     sel.innerHTML = teams.map(t => `<option value="${t.name}">${cap(t.name)} (${t.elo})</option>`).join("");
   }
-  $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "A";
+  $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "";
   buildSeg("A"); buildSeg("B");
   restoreLineup("A"); restoreLineup("B");
   await Promise.all([loadPool("A"), loadPool("B")]);
