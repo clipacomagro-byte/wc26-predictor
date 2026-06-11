@@ -53,6 +53,72 @@ export async function schedule({ force = false } = {}) {
   });
 }
 
+// Live match state: score, clock, key stats, event timeline. One API call.
+// Parsed defensively — exact stat keys vary by coverage level.
+export async function timeline(eventId) {
+  if (!/^sr:sport_event:\d+$/.test(eventId)) throw new Error("bad event id");
+  const raw = await sr(`/sport_events/${eventId}/timeline.json`);
+  const st = raw.sport_event_status ?? {};
+  const comps = raw.statistics?.totals?.competitors ?? [];
+  const statFor = (qualifier) => {
+    const c = comps.find(x => x.qualifier === qualifier);
+    const s = c?.statistics ?? {};
+    return {
+      possession: s.ball_possession ?? null,
+      shotsTotal: s.shots_total ?? null,
+      shotsOnTarget: s.shots_on_target ?? null,
+      corners: s.corner_kicks ?? null,
+      yellow: s.yellow_cards ?? null,
+      red: s.red_cards ?? null,
+    };
+  };
+  const ICONS = {
+    score_change: "⚽", yellow_card: "🟨", red_card: "🟥", yellow_red_card: "🟥",
+    substitution: "🔁", penalty_missed: "❌", penalty_awarded: "⚠️",
+    match_started: "▶", period_start: "▶", break_start: "⏸", match_ended: "🏁",
+    injury_time_shown: "⏱", video_assistant_referee: "📺", corner_kick: "🚩",
+  };
+  const events = (raw.timeline ?? [])
+    .filter(e => ICONS[e.type])
+    .map(e => ({
+      minute: e.match_time ?? null,
+      stoppage: e.stoppage_time ?? null,
+      icon: ICONS[e.type],
+      type: e.type,
+      side: e.competitor ?? null, // "home" | "away"
+      text: describeEvent(e),
+      score: e.type === "score_change" ? `${e.home_score}-${e.away_score}` : null,
+    }));
+  return {
+    status: st.status ?? "unknown",
+    matchStatus: st.match_status ?? null,
+    clock: st.clock?.played ?? null,
+    homeScore: st.home_score ?? 0,
+    awayScore: st.away_score ?? 0,
+    statsHome: statFor("home"),
+    statsAway: statFor("away"),
+    events,
+  };
+}
+
+function describeEvent(e) {
+  const players = (e.players ?? []).map(p => p.name?.includes(", ") ? p.name.split(", ").reverse().join(" ") : p.name);
+  switch (e.type) {
+    case "score_change": return `GOAL — ${players[0] ?? ""}${players[1] ? ` (assist ${players[1]})` : ""}`;
+    case "substitution": return `${players[1] ?? "?"} on, ${players[0] ?? "?"} off`;
+    case "yellow_card": case "red_card": case "yellow_red_card": return players[0] ?? "";
+    case "penalty_awarded": return "Penalty awarded";
+    case "penalty_missed": return `Penalty missed${players[0] ? ` — ${players[0]}` : ""}`;
+    case "match_started": return "Kick-off";
+    case "period_start": return `Period ${e.period ?? ""} start`;
+    case "break_start": return "Half-time";
+    case "match_ended": return "Full-time";
+    case "injury_time_shown": return `+${e.injury_time_announced ?? "?"} min added`;
+    case "video_assistant_referee": return "VAR check";
+    default: return e.type;
+  }
+}
+
 // Confirmed lineups for a sport_event (published ~1h before kickoff).
 export async function lineups(eventId) {
   if (!/^sr:sport_event:\d+$/.test(eventId)) throw new Error("bad event id");

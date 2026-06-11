@@ -149,6 +149,34 @@
   .actualIn { width: 32px; text-align: center; padding: 3px; }
   .okBtn { background: var(--line); border: none; color: var(--text); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
   .logCard { margin-top: 14px; }
+  /* live panel */
+  #livePanel { margin-top: 14px; display: none; border-color: #7f1d1d; }
+  #livePanel.on { display: block; }
+  .liveHead { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .liveScore { font-size: 30px; font-weight: 900; letter-spacing: 1px; }
+  .liveClock { color: var(--red); font-weight: 700; font-size: 15px; animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .liveGrid { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 14px; margin-top: 12px; }
+  @media (max-width: 1100px) { .liveGrid { grid-template-columns: 1fr; } }
+  .statBarRow { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 6px 0; }
+  .statBarRow .k { width: 86px; color: var(--dim); }
+  .statBarRow .vh, .statBarRow .va { width: 26px; text-align: center; font-weight: 700; }
+  .duo { flex: 1; height: 8px; display: flex; border-radius: 4px; overflow: hidden; background: #0a1018; }
+  .duo .l { background: var(--accent); } .duo .r { background: var(--blue); }
+  .signal { border: 1px solid #5a4a1e; border-radius: 10px; padding: 12px; background: linear-gradient(160deg, #221c0c, #100d06); }
+  .signal .sigHead { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; letter-spacing: 1px; }
+  .signal .balls { margin-left: auto; letter-spacing: 2px; }
+  .signal .sec { margin-top: 9px; font-size: 12.5px; }
+  .signal .sec b { display: block; color: var(--gold); font-size: 11px; letter-spacing: 1.5px; margin-bottom: 2px; }
+  .liveLog { max-height: 230px; overflow-y: auto; font-size: 12.5px; }
+  .liveLog .ev { display: flex; gap: 8px; padding: 5px 2px; border-bottom: 1px dashed #1a2636; align-items: baseline; }
+  .liveLog .min { width: 38px; color: var(--gold); font-weight: 700; text-align: right; }
+  .liveLog .goal { background: #10b9811a; border-radius: 6px; }
+  .liveProbs { display: flex; gap: 6px; margin-top: 10px; }
+  .liveProbs .lp { flex: 1; text-align: center; background: #0a1018; border: 1px solid var(--line); border-radius: 8px; padding: 6px 4px; }
+  .liveProbs .lp .v { font-size: 16px; font-weight: 800; }
+  .liveProbs .lp .d { font-size: 10px; color: var(--dim); }
+  .liveProbs .lp .delta { font-size: 10px; font-weight: 700; }
   .toast { position: fixed; bottom: 22px; right: 22px; background: var(--accent); color: #06281c; padding: 10px 18px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9; }
   .toast.show { opacity: 1; }
   .toast.err { background: var(--red); color: #2b0707; }
@@ -172,6 +200,34 @@
       <option value="">— pick a real World Cup match (Sportradar) —</option>
     </select>
     <span class="sub" id="matchInfo"></span>
+    <button class="btn" id="goLive">🔴 Go Live</button>
+    <button class="btn" id="demoLive" title="Preview the live panel with sample data">demo</button>
+  </div>
+
+  <!-- LIVE PANEL -->
+  <div class="card" id="livePanel">
+    <div class="liveHead">
+      <h2 style="margin:0">🔴 Live</h2>
+      <span class="liveScore" id="liveScore">—</span>
+      <span class="liveClock" id="liveClock"></span>
+      <span class="sub" id="liveStatus"></span>
+      <span class="sub" style="margin-left:auto" id="livePoll"></span>
+    </div>
+    <div class="liveGrid">
+      <div>
+        <h2>Match stats</h2>
+        <div id="liveStats"></div>
+        <div class="liveProbs" id="liveProbs"></div>
+      </div>
+      <div>
+        <h2>Signal</h2>
+        <div class="signal" id="signalCard"></div>
+      </div>
+      <div>
+        <h2>Event log</h2>
+        <div class="liveLog" id="liveLog"></div>
+      </div>
+    </div>
   </div>
 
   <div class="layout">
@@ -657,6 +713,109 @@ async function setActual(file) {
   loadLog();
 }
 
+/* ---------- live mode ---------- */
+const POLL_SEC = 60; // trial quota: one timeline call per poll, only while live
+let liveTimer = null;
+
+function liveOn() { return $("livePanel").classList.contains("on"); }
+
+async function pollLive(demo = false) {
+  let d;
+  if (demo) { d = DEMO_LIVE; }
+  else {
+    const a = $("teamA").value, b = $("teamB").value;
+    const home = $("venue").value === "A" ? a : $("venue").value === "B" ? b : "";
+    const q = new URLSearchParams({ event: currentEvent, a, b, home, sa: styles.A, sb: styles.B });
+    d = await (await fetch("/api/live?" + q)).json();
+    if (d.error) { toast(d.error, true); stopLive(); return; }
+  }
+  renderLive(d, demo);
+  if (!demo && (d.live.status === "closed" || d.live.status === "ended")) stopLive("Full-time — live polling stopped");
+}
+
+function renderLive(d, demo) {
+  const A = cap($("teamA").value), B = cap($("teamB").value);
+  $("livePanel").classList.add("on");
+  $("liveScore").textContent = `${A} ${d.live.homeScore} – ${d.live.awayScore} ${B}`;
+  $("liveClock").textContent = d.live.clock ? d.live.clock + "'" : "";
+  $("liveStatus").textContent = (d.live.matchStatus ?? d.live.status ?? "").replace(/_/g, " ");
+  $("livePoll").textContent = demo ? "DEMO DATA" : `updates every ${POLL_SEC}s · ${new Date().toLocaleTimeString()}`;
+  const sh = d.live.statsHome, sa = d.live.statsAway;
+  const bar = (k, vh, va, max) => {
+    if (vh == null && va == null) return "";
+    const t = Math.max(1, max ?? (vh ?? 0) + (va ?? 0));
+    return `<div class="statBarRow"><span class="k">${k}</span><span class="vh">${vh ?? "–"}</span>
+      <span class="duo"><span class="l" style="width:${(vh ?? 0) / t * 100}%"></span><span style="flex:1"></span><span class="r" style="width:${(va ?? 0) / t * 100}%"></span></span>
+      <span class="va">${va ?? "–"}</span></div>`;
+  };
+  $("liveStats").innerHTML =
+    bar("possession", sh.possession, sa.possession, 100) +
+    bar("shots", sh.shotsTotal, sa.shotsTotal) +
+    bar("on target", sh.shotsOnTarget, sa.shotsOnTarget) +
+    bar("corners", sh.corners, sa.corners) +
+    bar("cards", (sh.yellow ?? 0) + (sh.red ?? 0) * 2, (sa.yellow ?? 0) + (sa.red ?? 0) * 2);
+  const dpt = (now, pre) => {
+    const dd = (now - pre) * 100;
+    return `<span class="delta" style="color:${dd >= 1 ? "var(--accent)" : dd <= -1 ? "var(--red)" : "var(--dim)"}">${dd >= 0 ? "+" : ""}${dd.toFixed(0)}</span>`;
+  };
+  $("liveProbs").innerHTML = `
+    <div class="lp"><div class="v">${(d.model.winA * 100).toFixed(0)}%</div><div class="d">${A} ${dpt(d.model.winA, d.pre.winA)}</div></div>
+    <div class="lp"><div class="v">${(d.model.draw * 100).toFixed(0)}%</div><div class="d">draw ${dpt(d.model.draw, d.pre.draw)}</div></div>
+    <div class="lp"><div class="v">${(d.model.winB * 100).toFixed(0)}%</div><div class="d">${B} ${dpt(d.model.winB, d.pre.winB)}</div></div>`;
+  const balls = "🟠".repeat(d.signal.strength) + "⚪".repeat(5 - d.signal.strength);
+  const sigName = ["", "QUIET", "LOW SIGNAL", "MEDIUM SIGNAL", "STRONG SIGNAL", "MAX SIGNAL"][d.signal.strength];
+  $("signalCard").innerHTML = `
+    <div class="sigHead">${d.signal.strength >= 4 ? "🔴" : d.signal.strength >= 3 ? "🟡" : "⚪"} ${sigName}<span class="balls">${balls} ${d.signal.strength}/5</span></div>
+    <div class="sec"><b>⚡ THE EDGE</b>${d.signal.edge}</div>
+    <div class="sec"><b>📈 LIVE MODEL</b>${d.signal.call}</div>
+    <div class="sec"><b>⏱ REMAINING xG</b>${cap($("teamA").value)} ${d.model.remA.toFixed(2)} · ${cap($("teamB").value)} ${d.model.remB.toFixed(2)} · ${d.model.minutesLeft}' left (model time)</div>`;
+  $("liveLog").innerHTML = [...d.live.events].reverse().map(e => `
+    <div class="ev ${e.type === "score_change" ? "goal" : ""}">
+      <span class="min">${e.minute ?? ""}${e.stoppage ? "+" + e.stoppage : ""}${e.minute ? "'" : ""}</span>
+      <span>${e.icon}</span>
+      <span>${e.text}${e.score ? ` <b style="color:var(--gold)">${e.score}</b>` : ""}</span>
+      <span style="margin-left:auto;color:var(--dim);font-size:10px">${e.side ?? ""}</span>
+    </div>`).join("") || `<div class="empty">No events yet.</div>`;
+}
+
+function startLive() {
+  if (!currentEvent) return toast("Pick a match from the Fixtures list first", true);
+  $("goLive").textContent = "⏹ Stop Live";
+  pollLive();
+  liveTimer = setInterval(pollLive, POLL_SEC * 1000);
+}
+function stopLive(msg) {
+  clearInterval(liveTimer); liveTimer = null;
+  $("goLive").textContent = "🔴 Go Live";
+  if (msg) toast(msg);
+}
+
+const DEMO_LIVE = {
+  live: {
+    status: "live", matchStatus: "2nd_half", clock: "64:12", homeScore: 1, awayScore: 1,
+    statsHome: { possession: 61, shotsTotal: 14, shotsOnTarget: 6, corners: 7, yellow: 1, red: 0 },
+    statsAway: { possession: 39, shotsTotal: 5, shotsOnTarget: 3, corners: 2, yellow: 3, red: 0 },
+    events: [
+      { minute: 1, icon: "▶", type: "match_started", text: "Kick-off", side: null },
+      { minute: 12, icon: "⚽", type: "score_change", text: "GOAL — R. Jiménez (assist H. Lozano)", side: "home", score: "1-0" },
+      { minute: 23, icon: "🟨", type: "yellow_card", text: "T. Mokoena", side: "away" },
+      { minute: 31, icon: "🚩", type: "corner_kick", text: "corner_kick", side: "home" },
+      { minute: 45, icon: "⏱", type: "injury_time_shown", text: "+3 min added", side: null },
+      { minute: 45, icon: "⏸", type: "break_start", text: "Half-time", side: null },
+      { minute: 52, icon: "⚽", type: "score_change", text: "GOAL — L. Foster (assist T. Adams)", side: "away", score: "1-1" },
+      { minute: 58, icon: "🔁", type: "substitution", text: "S. Giménez on, R. Jiménez off", side: "home" },
+      { minute: 61, icon: "📺", type: "video_assistant_referee", text: "VAR check", side: null },
+    ],
+  },
+  model: { winA: 0.47, draw: 0.31, winB: 0.22, over25: 0.41, remA: 0.72, remB: 0.31, minutesLeft: 31, nextGoal10: 0.29 },
+  pre: { winA: 0.676, draw: 0.221, winB: 0.103 },
+  signal: {
+    strength: 4,
+    edge: "Mexico leading shots on target 6-3 without scoreboard reward. Mexico controlling possession 61%. Mexico win probability down 21pts vs pre-match.",
+    call: "Live model: mexico 47% / draw 31% / south-africa 22% · next goal in 10' 29%",
+  },
+};
+
 function toast(msg, isErr = false) {
   const t = $("toast");
   t.textContent = msg; t.className = "toast show" + (isErr ? " err" : "");
@@ -690,6 +849,8 @@ async function init() {
     const m = matches[$("matchPicker").value];
     if (m) applyMatch(m);
   });
+  $("goLive").addEventListener("click", () => liveTimer ? stopLive("Live polling stopped") : startLive());
+  $("demoLive").addEventListener("click", () => pollLive(true));
   $("log").addEventListener("click", (e) => { if (e.target.dataset?.file) setActual(e.target.dataset.file); });
   refresh(); loadIntel(); loadLog(); loadMatches();
 }

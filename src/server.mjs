@@ -7,7 +7,58 @@ import { ratings, predictFromLambdas, clampAdjust, baseLambdas, manualStyle, com
 import { intel } from "./form.mjs";
 import { teamDna } from "./teamdna.mjs";
 import { api, cache } from "./apifb.mjs";
-import { schedule, lineups as srLineups } from "./sportradar.mjs";
+import { schedule, lineups as srLineups, timeline } from "./sportradar.mjs";
+import { poissonPmf } from "../engine/elo.mjs";
+
+// Live in-play model: pre-match expected goals scaled to the time remaining,
+// folded over the current score → live win/draw/loss, totals, next-goal odds.
+function liveModel(preLambdaA, preLambdaB, homeScore, awayScore, minutesPlayed) {
+  const EFFECTIVE = 95; // injury time included
+  const left = Math.max(0, EFFECTIVE - minutesPlayed);
+  const remA = preLambdaA * left / EFFECTIVE;
+  const remB = preLambdaB * left / EFFECTIVE;
+  let winA = 0, draw = 0, winB = 0, over25 = 0;
+  for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) {
+    const p = poissonPmf(i, remA) * poissonPmf(j, remB);
+    const h = homeScore + i, a = awayScore + j;
+    if (h > a) winA += p; else if (h < a) winB += p; else draw += p;
+    if (h + a > 2.5) over25 += p;
+  }
+  const nextGoal10 = left > 0 ? 1 - Math.exp(-(remA + remB) * Math.min(10, left) / left) : 0;
+  return { winA, draw, winB, over25, remA, remB, minutesLeft: left, nextGoal10 };
+}
+
+// Signal card: divergence between live pressure and the scoreboard.
+function buildSignal(live, lm, pre, teamA, teamB) {
+  const sh = live.statsHome, sa = live.statsAway;
+  const sotDiff = (sh.shotsOnTarget ?? 0) - (sa.shotsOnTarget ?? 0);
+  const scoreDiff = live.homeScore - live.awayScore;
+  const notes = [];
+  let strength = 1;
+  // pressure not yet on the scoreboard
+  if (Math.abs(sotDiff) >= 3 && Math.sign(sotDiff) !== Math.sign(scoreDiff)) {
+    const presser = sotDiff > 0 ? teamA : teamB;
+    notes.push(`${presser} leading shots on target ${sh.shotsOnTarget ?? 0}-${sa.shotsOnTarget ?? 0} without scoreboard reward`);
+    strength += 2;
+  }
+  if (sh.possession != null && Math.abs(sh.possession - 50) >= 15) {
+    notes.push(`${sh.possession > 50 ? teamA : teamB} controlling possession ${Math.max(sh.possession, 100 - sh.possession)}%`);
+    strength += 1;
+  }
+  // model swing vs pre-match
+  const preWinA = pre.adjusted?.winA ?? pre.baseline.winA;
+  const swing = lm.winA - preWinA;
+  if (Math.abs(swing) >= 0.12) {
+    notes.push(`${teamA} win probability ${swing > 0 ? "up" : "down"} ${(Math.abs(swing) * 100).toFixed(0)}pts vs pre-match`);
+    strength += 1;
+  }
+  if (lm.nextGoal10 >= 0.45) { notes.push(`high goal pressure: ${(lm.nextGoal10 * 100).toFixed(0)}% chance of a goal in the next 10 min`); strength += 1; }
+  return {
+    strength: Math.min(5, strength),
+    edge: notes.length ? notes.join(". ") + "." : "No significant edge — match tracking the pre-match model.",
+    call: `Live model: ${teamA} ${(lm.winA * 100).toFixed(0)}% / draw ${(lm.draw * 100).toFixed(0)}% / ${teamB} ${(lm.winB * 100).toFixed(0)}% · next goal in 10' ${(lm.nextGoal10 * 100).toFixed(0)}%`,
+  };
+}
 
 const PORT = process.env.PORT || 3026;
 const PUBLIC = new URL("../public/", import.meta.url);
@@ -72,6 +123,17 @@ const server = createServer(async (req, res) => {
         id: f.fixture.id, date: f.fixture.date,
         home: f.teams.home.name, away: f.teams.away.name, status: f.fixture.status.short,
       })));
+    } else if (url.pathname === "/api/live") {
+      // live state + in-play model + signal, one Sportradar call per poll
+      const q = url.searchParams;
+      const live = await timeline(q.get("event"));
+      const pre = computePrediction(q);
+      const f = pre.adjusted ?? pre.baseline;
+      const clockMin = live.clock ? parseInt(live.clock.split(":")[0], 10) : 0;
+      const mins = live.matchStatus === "2nd_half" ? Math.max(clockMin, 45) : clockMin;
+      const lm = liveModel(f.lambda, f.mu, live.homeScore, live.awayScore, mins);
+      const signal = buildSignal(live, lm, pre, q.get("a"), q.get("b"));
+      json(res, 200, { live, model: lm, signal, pre: { winA: f.winA, draw: f.draw, winB: f.winB } });
     } else if (url.pathname === "/api/matches") {
       json(res, 200, await schedule({ force: url.searchParams.get("force") === "1" }));
     } else if (url.pathname === "/api/lineups") {
