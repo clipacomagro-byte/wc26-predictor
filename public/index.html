@@ -984,7 +984,7 @@ let groupSlots = {}; // {g: [winnerSlug, secondSlug, thirdSlug]}
 function refreshGroupOrder() {
   for (const g of Object.keys(bracketData.groups)) {
     const all = [...bracketData.groups[g]].sort((a, b) => (eloMap[b] ?? 0) - (eloMap[a] ?? 0));
-    const slots = groupSlots[g] ?? all.slice(0, 3);
+    const slots = groupSlots[g] ?? all;
     groupOrder[g] = [...slots, ...all.filter(s => !slots.includes(s))];
   }
 }
@@ -999,14 +999,13 @@ function resetBracket() {
   renderGroups(); renderKO();
 }
 
-const SLOT_LABELS = ["🥇 Winner", "🥈 Second", "3️⃣ Third"];
+const SLOT_LABELS = ["🥇 Winner", "🥈 Second", "3️⃣ Third", "❌ Out"];
 
 function renderGroups() {
   refreshGroupOrder();
   $("groupsGrid").innerHTML = Object.keys(groupOrder).sort().map(g => {
     const all = bracketData.groups[g];
-    const slots = groupOrder[g].slice(0, 3);
-    const fourth = groupOrder[g][3];
+    const slots = groupOrder[g];
     return `
     <div class="groupCard"><h3>GROUP ${g}
       ${groupSlots[g] ? `<button class="resetBtn" data-greset="${g}" title="back to model picks">↺ model</button>` : ""}</h3>
@@ -1018,14 +1017,13 @@ function renderGroups() {
           </select>
           ${i === 2 ? `<input type="checkbox" data-third="${g}" ${thirds.has(g) ? "checked" : ""} title="this third advances to the knockout">` : ""}
         </div>`).join("")}
-      <div class="gOut">4th: ${cap(fourth)} — out</div>
     </div>`;
   }).join("");
   $("thirdsCount").textContent = `thirds selected: ${thirds.size}/8`;
   for (const sel of document.querySelectorAll("[data-gsel]")) {
     sel.addEventListener("change", () => {
       const g = sel.dataset.gsel, slot = +sel.dataset.slot, chosen = sel.value;
-      const slots = (groupSlots[g] ?? groupOrder[g].slice(0, 3)).slice();
+      const slots = (groupSlots[g] ?? groupOrder[g]).slice();
       const prev = slots[slot];
       const elsewhere = slots.indexOf(chosen);
       if (elsewhere >= 0) slots[elsewhere] = prev; // swap if already placed
