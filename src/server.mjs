@@ -184,7 +184,9 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(readFileSync(new URL("index.html", PUBLIC)));
     } else if (url.pathname === "/api/teams") {
-      json(res, 200, Object.entries(ratings).sort((a, b) => b[1] - a[1]).map(([name, elo]) => ({ name, elo })));
+      const { formations } = JSON.parse(readFileSync(new URL("../data/formations.json", import.meta.url), "utf8"));
+      json(res, 200, Object.entries(ratings).sort((a, b) => b[1] - a[1])
+        .map(([name, elo]) => ({ name, elo, formation: formations[name] ?? "4-3-3" })));
     } else if (url.pathname === "/api/predict") {
       json(res, 200, computePrediction(url.searchParams));
     } else if (url.pathname === "/api/players") {

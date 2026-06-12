@@ -473,6 +473,15 @@ let styles = { A: "auto", B: "auto" };
 let debounce = null;
 let pool = { A: [], B: [] };       // player arrays per side
 let poolMap = { A: {}, B: {} };    // name → player
+let teamFormations = {};           // slug → typical formation under current coach
+
+// set a side's formation, adding the option if the preset list lacks it
+function setFormation(side, f) {
+  if (!f || !/^\d+(-\d+)+$/.test(String(f))) return;
+  const sel = $("formation" + side);
+  if (![...sel.options].some(o => o.value === f)) sel.add(new Option(f, f));
+  sel.value = f;
+}
 
 /* ---------- player database ---------- */
 async function loadPool(side) {
@@ -1295,16 +1304,19 @@ function toast(msg, isErr = false) {
 /* ---------- init ---------- */
 async function init() {
   const teams = await (await fetch("/api/teams")).json();
+  teamFormations = Object.fromEntries(teams.map(t => [t.name, t.formation]));
   for (const sel of [$("teamA"), $("teamB")]) {
     sel.innerHTML = teams.map(t => `<option value="${t.name}">${cap(t.name)}</option>`).join("");
   }
   $("teamA").value = "mexico"; $("teamB").value = "south-africa"; $("venue").value = "";
+  setFormation("A", teamFormations["mexico"]); setFormation("B", teamFormations["south-africa"]);
   renderPitch("A"); renderPitch("B");
   await Promise.all([loadPool("A"), loadPool("B")]);
   autoXI("A", true); autoXI("B", true);
   bindHover("A"); bindHover("B");
   for (const id of ["teamA", "teamB"]) $(id).addEventListener("change", () => {
     const side = id === "teamA" ? "A" : "B";
+    setFormation(side, teamFormations[$(id).value]); // each team's typical shape
     renderPitch(side);
     loadPool(side).then(() => autoXI(side, true)); // AI-predicted XI fills automatically
     refresh(); loadIntel(); loadFamily();
