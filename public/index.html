@@ -405,7 +405,7 @@
   <!-- BRACKET TAB -->
   <div id="tab-bracket" style="display:none">
     <div class="card" style="margin-bottom:14px">
-      <h2>Group stage — tap a team to move it up a place (top 2 qualify, ☑ = third-place qualifier, exactly 8)</h2>
+      <h2>Group stage — tap teams in the order they finish: 1st tap = winner, 2nd tap = runner-up… (top 2 qualify · ☑ = third-place qualifier, exactly 8 · tap again to undo)</h2>
       <div class="bracketBtns">
         <button class="btn" id="modelPicks">🤖 Model picks everything</button>
         <button class="btn" id="resetBracket">↺ Reset</button>
@@ -963,11 +963,24 @@ async function loadBracket() {
   resetBracket();
 }
 
+// user ranks each group by tapping teams in finishing order; unranked teams
+// trail in model (Elo) order, so the default = model prediction
+let groupRank = {}; // {g: [slugs in the order the user tapped them]}
+
+function orderFor(g) {
+  const base = [...bracketData.groups[g]].sort((a, b) => (eloMap[b] ?? 0) - (eloMap[a] ?? 0));
+  const ranked = (groupRank[g] ?? []).filter(s => base.includes(s));
+  return [...ranked, ...base.filter(s => !ranked.includes(s))];
+}
+
+function refreshGroupOrder() {
+  for (const g of Object.keys(bracketData.groups)) groupOrder[g] = orderFor(g);
+}
+
 function resetBracket() {
+  groupRank = {};
   groupOrder = {};
-  for (const [g, slugs] of Object.entries(bracketData.groups)) {
-    groupOrder[g] = [...slugs].sort((a, b) => (eloMap[b] ?? 0) - (eloMap[a] ?? 0));
-  }
+  refreshGroupOrder();
   // default thirds: the 8 strongest third-placed teams
   thirds = new Set(Object.keys(groupOrder).sort((a, b) => (eloMap[groupOrder[b][2]] ?? 0) - (eloMap[groupOrder[a][2]] ?? 0)).slice(0, 8));
   picks = {};
@@ -975,22 +988,40 @@ function resetBracket() {
 }
 
 function renderGroups() {
-  $("groupsGrid").innerHTML = Object.keys(groupOrder).sort().map(g => `
-    <div class="groupCard"><h3>GROUP ${g}</h3>
+  refreshGroupOrder();
+  $("groupsGrid").innerHTML = Object.keys(groupOrder).sort().map(g => {
+    const rankedN = (groupRank[g] ?? []).length;
+    return `
+    <div class="groupCard"><h3>GROUP ${g}
+      ${rankedN ? `<button class="resetBtn" data-greset="${g}" title="back to model order">↺</button>` : ""}
+      <span style="float:right;color:var(--dim);font-weight:400;font-size:10px">${rankedN ? "your order" : "model order — tap to set yours"}</span></h3>
       ${groupOrder[g].map((s, i) => `
-        <div class="gRow ${i < 2 ? "q" + (i + 1) : i === 2 ? "q3" : ""}" data-g="${g}" data-i="${i}" title="${i > 0 ? "tap to move " + cap(s) + " up" : cap(s) + " tops the group"}">
-          <span class="pos">${i + 1}</span><span>${i > 0 ? "▲ " : ""}${cap(s)}</span>
+        <div class="gRow ${i < 2 ? "q" + (i + 1) : i === 2 ? "q3" : ""}" data-g="${g}" data-s="${s}"
+             title="${i < rankedN ? "tap to un-pick" : "tap = finishes " + (rankedN + 1) + (rankedN === 0 ? "st (winner)" : rankedN === 1 ? "nd" : rankedN === 2 ? "rd" : "th")}">
+          <span class="pos" style="${i < rankedN ? "color:var(--accent);font-weight:800" : "opacity:.5"}">${i + 1}</span>
+          <span>${cap(s)}</span>
           ${i === 2 ? `<input type="checkbox" data-third="${g}" ${thirds.has(g) ? "checked" : ""} title="advances as third">` : ""}
         </div>`).join("")}
-    </div>`).join("");
+    </div>`;
+  }).join("");
   $("thirdsCount").textContent = `thirds selected: ${thirds.size}/8`;
   for (const row of document.querySelectorAll(".gRow")) {
     row.addEventListener("click", (e) => {
       if (e.target.dataset?.third !== undefined) return; // checkbox handles itself
-      const g = row.dataset.g, i = +row.dataset.i;
-      if (i === 0) return;
-      [groupOrder[g][i - 1], groupOrder[g][i]] = [groupOrder[g][i], groupOrder[g][i - 1]];
+      const g = row.dataset.g, s = row.dataset.s;
+      groupRank[g] ??= [];
+      const idx = groupRank[g].indexOf(s);
+      if (idx >= 0) groupRank[g].splice(idx);      // un-pick this team and everything after it
+      else if (groupRank[g].length < 4) groupRank[g].push(s);
       picks = {}; // group changes invalidate knockout picks
+      renderGroups(); renderKO();
+    });
+  }
+  for (const btn of document.querySelectorAll("[data-greset]")) {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      delete groupRank[btn.dataset.greset];
+      picks = {};
       renderGroups(); renderKO();
     });
   }
