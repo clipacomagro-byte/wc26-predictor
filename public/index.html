@@ -405,7 +405,7 @@
   <!-- BRACKET TAB -->
   <div id="tab-bracket" style="display:none">
     <div class="card" style="margin-bottom:14px">
-      <h2>Group stage — click a team to move it up · ☑ pick exactly 8 third-placed qualifiers</h2>
+      <h2>Group stage — tap a team to move it up a place (top 2 qualify, ☑ = third-place qualifier, exactly 8)</h2>
       <div class="bracketBtns">
         <button class="btn" id="modelPicks">🤖 Model picks everything</button>
         <button class="btn" id="resetBracket">↺ Reset</button>
@@ -978,8 +978,8 @@ function renderGroups() {
   $("groupsGrid").innerHTML = Object.keys(groupOrder).sort().map(g => `
     <div class="groupCard"><h3>GROUP ${g}</h3>
       ${groupOrder[g].map((s, i) => `
-        <div class="gRow ${i < 2 ? "q" + (i + 1) : i === 2 ? "q3" : ""}" data-g="${g}" data-i="${i}">
-          <span class="pos">${i + 1}</span><span>${cap(s)}</span>
+        <div class="gRow ${i < 2 ? "q" + (i + 1) : i === 2 ? "q3" : ""}" data-g="${g}" data-i="${i}" title="${i > 0 ? "tap to move " + cap(s) + " up" : cap(s) + " tops the group"}">
+          <span class="pos">${i + 1}</span><span>${i > 0 ? "▲ " : ""}${cap(s)}</span>
           ${i === 2 ? `<input type="checkbox" data-third="${g}" ${thirds.has(g) ? "checked" : ""} title="advances as third">` : ""}
         </div>`).join("")}
     </div>`).join("");
@@ -996,6 +996,10 @@ function renderGroups() {
   }
   for (const cb of document.querySelectorAll("[data-third]")) {
     cb.addEventListener("change", () => {
+      if (cb.checked && thirds.size >= 8) {
+        cb.checked = false;
+        return toast("Already 8 thirds picked — untick another group's third first", true);
+      }
       cb.checked ? thirds.add(cb.dataset.third) : thirds.delete(cb.dataset.third);
       picks = {};
       renderGroups(); renderKO();

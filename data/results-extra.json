@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-06-11T19:25:27.439Z",
+ "fetchedAt": "2026-06-12T12:36:10.249Z",
  "matches": [
   {
    "id": "sr:sport_event:71284962",
@@ -1794,6 +1794,32 @@
    "ag": 4,
    "leagueId": null,
    "leagueName": "Friendlies"
+  },
+  {
+   "id": "sr:sport_event:66456904",
+   "ts": 1781204400,
+   "date": "2026-06-11",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Mexico",
+   "awayName": "South Africa",
+   "hg": 2,
+   "ag": 0,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:66456906",
+   "ts": 1781229600,
+   "date": "2026-06-12",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Korea Republic",
+   "awayName": "Czechia",
+   "hg": 2,
+   "ag": 1,
+   "leagueId": null,
+   "leagueName": "World Cup"
   }
  ]
 }
