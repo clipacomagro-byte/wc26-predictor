@@ -45,33 +45,45 @@
   .seg button:hover:not(.on) { color: var(--text); }
   .styleName { text-align: center; font-size: 11px; color: var(--gold); margin-top: 4px; letter-spacing: 1px; }
 
-  /* pitch */
-  .pitch {
-    position: relative; margin-top: 12px; border-radius: 10px; overflow: hidden;
+  /* pitch — 3D stadium-cam perspective */
+  .pitch { position: relative; margin-top: 14px; padding-top: 10px; perspective: 1150px; }
+  .field {
+    position: relative; aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden;
+    transform: rotateX(21deg); transform-origin: center 58%; transform-style: preserve-3d;
     background:
-      repeating-linear-gradient(0deg, var(--pitch1) 0 36px, var(--pitch2) 36px 72px);
-    border: 1px solid #2a5a40; aspect-ratio: 3 / 4;
+      radial-gradient(130% 70% at 50% -5%, rgba(255,255,255,.07), transparent 55%),
+      repeating-linear-gradient(0deg, #1d4d34 0 30px, #194329 30px 60px);
+    border: 1px solid #2d6044;
+    box-shadow: 0 28px 46px -18px rgba(0,0,0,.85), inset 0 0 90px rgba(0,0,0,.4);
   }
-  .pitch svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .field svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .chip {
-    position: absolute; transform: translate(-50%, -50%); width: 76px; text-align: center;
+    position: absolute; transform: translate(-50%, -50%) rotateX(-21deg);
+    transform-style: preserve-3d; width: 84px; text-align: center; z-index: 2;
   }
+  .chip .disc {
+    width: 32px; height: 32px; margin: 0 auto 3px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #d3deec;
+    background: radial-gradient(circle at 36% 28%, #36475c, #0b1320);
+    border: 1.5px solid rgba(255,255,255,.28);
+    box-shadow: 0 5px 9px rgba(0,0,0,.55), inset 0 1px 1px rgba(255,255,255,.25);
+    transition: transform .12s;
+  }
+  .chip:hover .disc { transform: scale(1.12); }
+  .chip .disc.gold { background: radial-gradient(circle at 36% 28%, #f8e293, #c6982e); color: #3a2c06; border-color: #f5d77a; }
+  .chip .disc.silver { background: radial-gradient(circle at 36% 28%, #eef2f6, #9aa4b2); color: #20272f; border-color: #e2e8ee; }
+  .chip .disc.bronze { background: radial-gradient(circle at 36% 28%, #e4ad77, #a06536); color: #2b1808; border-color: #e0a06b; }
+  .chip .pos { font-size: 8px; color: rgba(255,255,255,.6); letter-spacing: 1.5px; margin-bottom: 1px; text-shadow: 0 1px 2px #000; }
   .chip input {
-    width: 100%; background: rgba(7,14,11,.78); border: 1px solid rgba(255,255,255,.18);
-    color: #fff; font-size: 10.5px; text-align: center; border-radius: 7px; padding: 4px 3px;
+    width: 100%; background: rgba(8,14,22,.82); border: 1px solid rgba(255,255,255,.16);
+    color: #fff; font-size: 10px; text-align: center; border-radius: 7px; padding: 3px 2px;
+    text-overflow: ellipsis; backdrop-filter: blur(3px);
+    box-shadow: 0 3px 6px rgba(0,0,0,.45);
   }
-  .chip input:focus { border-color: var(--accent); outline: none; }
-  .chip .pos { font-size: 9px; color: rgba(255,255,255,.75); letter-spacing: 1px; text-shadow: 0 1px 2px #000; }
+  .chip input:focus { border-color: var(--accent); outline: none; background: rgba(8,14,22,.95); }
   .loadRow { display: flex; gap: 6px; margin-top: 10px; }
   .loadRow input { flex: 1; }
-  .chip .ovr {
-    position: absolute; top: 8px; right: -7px; min-width: 19px; height: 17px; line-height: 17px;
-    border-radius: 5px; font-size: 10px; font-weight: 800; color: #1a1408; padding: 0 2px;
-    background: #9aa4b2; display: none;
-  }
-  .chip .ovr.gold { background: linear-gradient(180deg, #f5d77a, #c9a13b); }
-  .chip .ovr.silver { background: linear-gradient(180deg, #d9dee5, #9aa4b2); }
-  .chip .ovr.bronze { background: linear-gradient(180deg, #d9a06b, #a06536); }
 
   /* FIFA-style player card */
   #pcard {
@@ -534,10 +546,10 @@ function ovrClass(ovr) { return ovr >= 80 ? "gold" : ovr >= 73 ? "silver" : "bro
 function refreshBadges(side) {
   for (const chip of $("pitch" + side).querySelectorAll(".chip")) {
     const inp = chip.querySelector("input");
-    const badge = chip.querySelector(".ovr");
+    const disc = chip.querySelector(".disc");
     const p = poolMap[side][inp.value.trim()];
-    if (p) { badge.textContent = p.ovr; badge.className = "ovr " + ovrClass(p.ovr); badge.style.display = "block"; }
-    else badge.style.display = "none";
+    if (p) { disc.textContent = p.ovr; disc.className = "disc " + ovrClass(p.ovr); }
+    else { disc.textContent = disc.dataset.pos; disc.className = "disc"; }
   }
 }
 
@@ -617,14 +629,17 @@ function autoXI(side, quiet = false) {
 
 /* ---------- pitch ---------- */
 const PITCH_SVG = `<svg viewBox="0 0 300 400" preserveAspectRatio="none">
-  <g stroke="var(--pitchline)" stroke-width="2" fill="none">
-    <rect x="6" y="6" width="288" height="388" rx="4"/>
-    <line x1="6" y1="200" x2="294" y2="200"/>
-    <circle cx="150" cy="200" r="34"/>
-    <rect x="75" y="6" width="150" height="58"/>
-    <rect x="113" y="6" width="74" height="24"/>
-    <rect x="75" y="336" width="150" height="58"/>
-    <rect x="113" y="370" width="74" height="24"/>
+  <g stroke="rgba(255,255,255,.32)" stroke-width="2" fill="none">
+    <rect x="7" y="7" width="286" height="386" rx="5"/>
+    <line x1="7" y1="200" x2="293" y2="200"/>
+    <circle cx="150" cy="200" r="36"/>
+    <circle cx="150" cy="200" r="2.5" fill="rgba(255,255,255,.4)" stroke="none"/>
+    <rect x="72" y="7" width="156" height="60"/>
+    <rect x="111" y="7" width="78" height="26"/>
+    <path d="M 118 67 A 36 36 0 0 0 182 67" />
+    <rect x="72" y="333" width="156" height="60"/>
+    <rect x="111" y="367" width="78" height="26"/>
+    <path d="M 118 333 A 36 36 0 0 1 182 333" />
   </g></svg>`;
 
 function rowLabel(rowIdx, rowCount, n, i) {
@@ -646,26 +661,29 @@ function renderPitch(side) {
   const pitch = $("pitch" + side);
   const formation = $("formation" + side).value;
   const old = getPlayers(side); // keep typed names across formation changes
-  pitch.innerHTML = PITCH_SVG;
+  pitch.innerHTML = `<div class="field" id="field${side}">${PITCH_SVG}</div>`;
+  const field = $("field" + side);
   let rows = String(formation).split("-").map(Number);
   if (rows.some(n => !Number.isInteger(n) || n < 1) || rows.reduce((a, b) => a + b, 0) !== 10) {
     rows = [4, 3, 3]; // defensive fallback for malformed formation strings
   }
-  const slots = [{ x: 50, y: 91, pos: "GK" }];
+  const slots = [{ x: 50, y: 90, pos: "GK" }];
   rows.forEach((n, r) => {
-    const y = 76 - (r + 1) * (62 / (rows.length + 0.4));
+    const y = 75 - (r + 1) * (60 / (rows.length + 0.4));
+    const margin = n >= 5 ? 17 : n === 4 ? 14 : 13; // wider rows tuck further in to fit the plates
+    const span = 100 - 2 * margin;
     for (let i = 0; i < n; i++) {
-      slots.push({ x: n === 1 ? 50 : 10 + (80 / (n - 1)) * i, y, pos: rowLabel(r, rows.length, n, i) });
+      slots.push({ x: n === 1 ? 50 : margin + (span / (n - 1)) * i, y, pos: rowLabel(r, rows.length, n, i) });
     }
   });
   slots.forEach((s, i) => {
     const div = document.createElement("div");
     div.className = "chip";
     div.style.left = s.x + "%"; div.style.top = s.y + "%";
-    div.innerHTML = `<div class="pos">${s.pos}</div><input data-slot="${i}" placeholder="${s.pos}" list="dl${side}" value="${old[i] ?? ""}"><span class="ovr"></span>`;
-    pitch.appendChild(div);
+    div.innerHTML = `<div class="disc" data-pos="${s.pos}">${s.pos}</div><div class="pos">${s.pos}</div><input data-slot="${i}" placeholder="add player" list="dl${side}" value="${old[i] ?? ""}">`;
+    field.appendChild(div);
   });
-  for (const inp of pitch.querySelectorAll("input")) {
+  for (const inp of field.querySelectorAll("input")) {
     inp.addEventListener("input", () => refreshBadges(side));
   }
   refreshBadges(side);
