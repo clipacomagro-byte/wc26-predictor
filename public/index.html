@@ -195,6 +195,25 @@
   .oddsTable td.num { text-align: right; }
   .oddsTable .fav { color: var(--accent); font-weight: 700; }
   .stagePill { font-size: 10px; background: #0a1018; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--dim); }
+
+  /* stats tab */
+  .statsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .statsGrid { grid-template-columns: 1fr; } }
+  .lbRow { display: flex; align-items: center; gap: 10px; padding: 7px 4px; border-bottom: 1px solid #16202e; }
+  .lbRow .rk { width: 22px; text-align: center; font-weight: 800; color: var(--dim); font-size: 13px; }
+  .lbRow.r1 .rk { color: #f5d77a; } .lbRow.r2 .rk { color: #d9dee5; } .lbRow.r3 .rk { color: #d9a06b; }
+  .lbRow .who { flex: 1; min-width: 0; }
+  .lbRow .who .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lbRow .who .tm { font-size: 11px; color: var(--dim); }
+  .lbRow .bar { flex: 1.4; height: 18px; background: #0a1018; border-radius: 5px; overflow: hidden; }
+  .lbRow .bar > div { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 5px; }
+  .lbRow .val { width: 60px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lbRow .val small { color: var(--dim); font-weight: 500; }
+  .statsEmpty { color: var(--dim); font-size: 13px; padding: 14px 4px; }
+  .tgRow { display: grid; grid-template-columns: 1.4fr repeat(4, 0.6fr); gap: 6px; padding: 6px 4px; border-bottom: 1px solid #16202e; font-size: 13px; align-items: center; }
+  .tgRow.head { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .tgRow .num { text-align: center; font-variant-numeric: tabular-nums; }
+  .tgRow .gd.pos { color: var(--accent); } .tgRow .gd.neg { color: var(--red); }
   .oddsPick { cursor: pointer; border-radius: 5px; transition: background .15s; }
   .oddsPick:hover { background: #1d2a3c; outline: 1px solid var(--accent); }
   .oddsPick.inSlip { background: #10b98126; outline: 1px solid var(--accent); font-weight: 700; }
@@ -277,6 +296,7 @@
     <button class="on" data-tab="center">⚽ Match Center</button>
     <button data-tab="bracket">🏆 Bracket Predictor</button>
     <button data-tab="odds">📊 Odds Board</button>
+    <button data-tab="stats">👑 Tournament Stats</button>
   </div>
 
   <div class="card" id="fixturesBar" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -456,6 +476,22 @@
       <div style="overflow-x:auto"><table class="oddsTable" id="oddsTable"><thead>
         <tr><th>date</th><th>match</th><th colspan="3">model %  (1 / X / 2)</th><th colspan="3">model fair odds</th><th colspan="3">market odds (median)</th><th>o2.5 mdl/mkt</th><th>top score</th><th>value</th><th>result</th></tr>
       </thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- STATS TAB -->
+  <div id="tab-stats" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <h2>👑 Golden Boot race — top scorers <span style="text-transform:none;letter-spacing:0" id="statsMeta"></span></h2>
+      <div id="scorers"></div>
+    </div>
+    <div class="statsGrid">
+      <div class="card"><h2>🅰️ Assists</h2><div id="assists"></div></div>
+      <div class="card"><h2>🟨 Discipline (cards)</h2><div id="cards"></div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>🥅 Team scoring — goals for &amp; against (this tournament)</h2>
+      <div id="teamGoals"></div>
     </div>
   </div>
 </div>
@@ -956,8 +992,57 @@ function switchTab(name) {
   for (const el of centerEls) el.style.display = name === "center" ? "" : "none";
   $("tab-bracket").style.display = name === "bracket" ? "" : "none";
   $("tab-odds").style.display = name === "odds" ? "" : "none";
+  $("tab-stats").style.display = name === "stats" ? "" : "none";
   if (name === "bracket" && !bracketData) loadBracket();
   if (name === "odds" && !oddsLoaded) loadOdds();
+  if (name === "stats") loadStats(); // always refresh — leaders change as matches play
+}
+
+/* ---------- tournament stats ---------- */
+async function loadStats() {
+  const d = await (await fetch("/api/leaders")).json();
+  if (!d.available) {
+    $("scorers").innerHTML = `<div class="statsEmpty">Stats feed unavailable (${d.reason ?? "no key"}).</div>`;
+    $("assists").innerHTML = $("cards").innerHTML = "";
+  } else {
+    const lb = (rows, valFn, suffix) => {
+      if (!rows || !rows.length) return `<div class="statsEmpty">No data yet — fills in as matches are played.</div>`;
+      const max = Math.max(...rows.map(r => valFn(r)), 1);
+      return rows.slice(0, 15).map((r, i) => `
+        <div class="lbRow r${i + 1}">
+          <span class="rk">${i + 1}</span>
+          <span class="who"><div class="nm">${r.name}</div><div class="tm">${r.team ?? ""}</div></span>
+          <span class="bar"><div style="width:${valFn(r) / max * 100}%"></div></span>
+          <span class="val">${valFn(r)}<small> ${suffix}</small></span>
+        </div>`).join("");
+    };
+    $("statsMeta").textContent = "· live from Sportradar, updates every few hours";
+    $("scorers").innerHTML = lb(d.goals, r => r.goals || r.value, "goals");
+    $("assists").innerHTML = lb(d.assists, r => r.assists || r.value, "ast");
+    // discipline: combine yellow + red lists
+    const disc = [...(d.yellow_cards ?? []), ...(d.red_cards ?? [])]
+      .reduce((acc, r) => { const k = r.name + r.team; (acc[k] ??= { ...r }); acc[k].yellow = Math.max(acc[k].yellow, r.yellow); acc[k].red = Math.max(acc[k].red, r.red); return acc; }, {});
+    const discRows = Object.values(disc).sort((a, b) => (b.red * 2 + b.yellow) - (a.red * 2 + a.yellow));
+    $("cards").innerHTML = discRows.length
+      ? discRows.slice(0, 15).map((r, i) => `
+        <div class="lbRow">
+          <span class="rk">${i + 1}</span>
+          <span class="who"><div class="nm">${r.name}</div><div class="tm">${r.team ?? ""}</div></span>
+          <span class="val">${r.yellow ? "🟨".repeat(Math.min(r.yellow, 5)) : ""}${r.red ? "🟥".repeat(r.red) : ""}</span>
+        </div>`).join("")
+      : `<div class="statsEmpty">No cards yet.</div>`;
+  }
+  loadTeamGoals();
+}
+
+// team scoring table, derived from ingested results (works offline of the leaders feed)
+async function loadTeamGoals() {
+  const rows = await (await fetch("/api/team-goals")).json();
+  if (!rows.length) { $("teamGoals").innerHTML = `<div class="statsEmpty">No World Cup matches played yet.</div>`; return; }
+  $("teamGoals").innerHTML = `<div class="tgRow head"><span>team</span><span class="num">P</span><span class="num">GF</span><span class="num">GA</span><span class="num">GD</span></div>` +
+    rows.map(t => `<div class="tgRow"><span>${cap(t.slug)}</span>
+      <span class="num">${t.played}</span><span class="num">${t.gf}</span><span class="num">${t.ga}</span>
+      <span class="num gd ${t.gd > 0 ? "pos" : t.gd < 0 ? "neg" : ""}">${t.gd > 0 ? "+" : ""}${t.gd}</span></div>`).join("");
 }
 
 /* ---------- bracket predictor ---------- */

@@ -8,6 +8,8 @@ export const WC_SEASON = "sr:season:101177";
 const CACHE_DIR = new URL("../data-cache/", import.meta.url);
 const SCHEDULE_CACHE = new URL("sr_schedule.json", CACHE_DIR);
 const SCHEDULE_MAX_AGE_MIN = 360; // refetch schedule every 6h (scores/status update)
+const LEADERS_CACHE = new URL("sr_leaders.json", CACHE_DIR);
+const LEADERS_MAX_AGE_MIN = 180; // tournament leaders refresh every 3h
 
 function loadKey() {
   if (process.env.SPORTRADAR_KEY) return process.env.SPORTRADAR_KEY;
@@ -51,6 +53,40 @@ export async function schedule({ force = false } = {}) {
       awayScore: s.sport_event_status?.away_score ?? null,
     };
   });
+}
+
+// Tournament statistical leaders: top scorers, assists, cards. One cached call.
+export async function leaders({ force = false } = {}) {
+  let raw;
+  if (!force && existsSync(LEADERS_CACHE) &&
+      (Date.now() - statSync(LEADERS_CACHE).mtimeMs) / 60000 < LEADERS_MAX_AGE_MIN) {
+    raw = JSON.parse(readFileSync(LEADERS_CACHE, "utf8"));
+  } else {
+    raw = await sr(`/seasons/${WC_SEASON}/leaders.json`);
+    mkdirSync(CACHE_DIR, { recursive: true });
+    writeFileSync(LEADERS_CACHE, JSON.stringify(raw));
+  }
+  const want = ["goals", "assists", "points", "yellow_cards", "red_cards"];
+  const out = {};
+  for (const list of raw.lists ?? []) {
+    if (!want.includes(list.type)) continue;
+    out[list.type] = (list.leaders ?? []).flatMap(entry =>
+      (entry.players ?? []).map(p => {
+        const comp = p.competitors?.[0];
+        const dp = (v) => comp?.datapoints?.find(d => d.type === v)?.value ?? 0;
+        const nameParts = String(p.name).split(", ");
+        return {
+          rank: entry.rank,
+          name: nameParts.length === 2 ? `${nameParts[1]} ${nameParts[0]}` : p.name,
+          team: comp?.name ?? null,
+          teamSlug: comp ? slugForName(comp.name) : null,
+          goals: dp("goals"), assists: dp("assists"),
+          yellow: dp("yellow_cards"), red: dp("red_cards"),
+          value: dp(list.type),
+        };
+      }));
+  }
+  return out;
 }
 
 // Tournament structure from the cached schedule: 12 real groups + the official

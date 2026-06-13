@@ -7,7 +7,7 @@ import { ratings, predictFromLambdas, clampAdjust, baseLambdas, manualStyle, com
 import { intel } from "./form.mjs";
 import { teamDna } from "./teamdna.mjs";
 import { api, cache } from "./apifb.mjs";
-import { schedule, lineups as srLineups, timeline, bracket } from "./sportradar.mjs";
+import { schedule, lineups as srLineups, timeline, bracket, leaders } from "./sportradar.mjs";
 import { marketOdds } from "./oddsapi.mjs";
 import { expectedScore } from "../engine/elo.mjs";
 import { poissonPmf } from "../engine/elo.mjs";
@@ -253,6 +253,27 @@ const server = createServer(async (req, res) => {
     } else if (url.pathname === "/api/refresh" && req.method === "POST") {
       refreshData();
       json(res, 200, { started: true, lastRefresh });
+    } else if (url.pathname === "/api/leaders") {
+      try {
+        json(res, 200, { available: true, ...(await leaders()) });
+      } catch (e) {
+        json(res, 200, { available: false, reason: e.message });
+      }
+    } else if (url.pathname === "/api/team-goals") {
+      // GF/GA/GD per team from ingested World Cup results only
+      const tg = {};
+      for (const m of allMatches) {
+        if (m.leagueName !== "World Cup") continue;
+        const hs = sideSlugCached(m, "home"), as = sideSlugCached(m, "away");
+        if (ratings[hs] == null && ratings[as] == null) continue;
+        (tg[hs] ??= { slug: hs, played: 0, gf: 0, ga: 0 });
+        (tg[as] ??= { slug: as, played: 0, gf: 0, ga: 0 });
+        tg[hs].played++; tg[hs].gf += m.hg; tg[hs].ga += m.ag;
+        tg[as].played++; tg[as].gf += m.ag; tg[as].ga += m.hg;
+      }
+      const out = Object.values(tg).map(t => ({ ...t, gd: t.gf - t.ga }))
+        .sort((a, b) => b.gd - a.gd || b.gf - a.gf);
+      json(res, 200, out);
     } else if (url.pathname === "/api/bracket") {
       json(res, 200, await bracket());
     } else if (url.pathname === "/api/oddsboard") {
