@@ -259,6 +259,34 @@ const server = createServer(async (req, res) => {
       } catch (e) {
         json(res, 200, { available: false, reason: e.message });
       }
+    } else if (url.pathname === "/api/standings") {
+      // live group tables from ingested World Cup results (3-1-0 points)
+      let groups = {};
+      try { ({ groups } = await bracket()); } catch { groups = {}; }
+      const teamGroup = {};
+      for (const [g, slugs] of Object.entries(groups)) for (const s of slugs) teamGroup[s] = g;
+      const rows = {}; // slug -> stats
+      for (const [g, slugs] of Object.entries(groups))
+        for (const s of slugs) rows[s] = { slug: s, group: g, P: 0, W: 0, D: 0, L: 0, GF: 0, GA: 0, Pts: 0 };
+      for (const m of allMatches) {
+        if (m.leagueName !== "World Cup") continue;
+        const hs = sideSlugCached(m, "home"), as = sideSlugCached(m, "away");
+        // only count if both teams are in the same group (group-stage games)
+        if (!rows[hs] || !rows[as] || teamGroup[hs] !== teamGroup[as]) continue;
+        const rh = rows[hs], ra = rows[as];
+        rh.P++; ra.P++; rh.GF += m.hg; rh.GA += m.ag; ra.GF += m.ag; ra.GA += m.hg;
+        if (m.hg > m.ag) { rh.W++; rh.Pts += 3; ra.L++; }
+        else if (m.hg < m.ag) { ra.W++; ra.Pts += 3; rh.L++; }
+        else { rh.D++; ra.D++; rh.Pts++; ra.Pts++; }
+      }
+      const byGroup = {};
+      for (const r of Object.values(rows)) {
+        r.GD = r.GF - r.GA;
+        (byGroup[r.group] ??= []).push(r);
+      }
+      for (const g of Object.keys(byGroup))
+        byGroup[g].sort((a, b) => b.Pts - a.Pts || b.GD - a.GD || b.GF - a.GF);
+      json(res, 200, byGroup);
     } else if (url.pathname === "/api/team-goals") {
       // GF/GA/GD per team from ingested World Cup results only
       const tg = {};

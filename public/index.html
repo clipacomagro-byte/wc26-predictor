@@ -226,6 +226,16 @@
   .tgRow.head { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
   .tgRow .num { text-align: center; font-variant-numeric: tabular-nums; }
   .tgRow .gd.pos { color: var(--accent); } .tgRow .gd.neg { color: var(--red); }
+  /* group standings */
+  .stTable { background: #0a1018; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .stTable h3 { font-size: 12px; color: var(--gold); letter-spacing: 1px; margin-bottom: 5px; }
+  .stRow { display: grid; grid-template-columns: 14px 1fr 18px 18px 18px 30px 22px; gap: 4px; padding: 4px 2px; font-size: 12px; align-items: center; border-bottom: 1px solid #16202e; }
+  .stRow.head { color: var(--dim); font-size: 9.5px; text-transform: uppercase; letter-spacing: .5px; }
+  .stRow .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stRow .c { text-align: center; font-variant-numeric: tabular-nums; }
+  .stRow .pts { text-align: center; font-weight: 800; color: var(--accent); }
+  .stRow.q1, .stRow.q2 { border-left: 2px solid var(--accent); padding-left: 4px; }
+  .stRow.q3 { border-left: 2px solid var(--gold); padding-left: 4px; }
   .oddsPick { cursor: pointer; border-radius: 5px; transition: background .15s; }
   .oddsPick:hover { background: #1d2a3c; outline: 1px solid var(--accent); }
   .oddsPick.inSlip { background: #10b98126; outline: 1px solid var(--accent); font-weight: 700; }
@@ -493,6 +503,10 @@
 
   <!-- STATS TAB -->
   <div id="tab-stats" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <h2>📊 Group standings — live <span style="text-transform:none;letter-spacing:0" id="standingsMeta"></span></h2>
+      <div class="groupsGrid" id="standings"></div>
+    </div>
     <div class="card" style="margin-bottom:14px">
       <h2>👑 Golden Boot race — top scorers <span style="text-transform:none;letter-spacing:0" id="statsMeta"></span></h2>
       <div id="scorers"></div>
@@ -1016,8 +1030,28 @@ function switchTab(name) {
   if (name === "stats") loadStats(); // always refresh — leaders change as matches play
 }
 
+/* ---------- group standings ---------- */
+async function loadStandings() {
+  const byGroup = await (await fetch("/api/standings")).json();
+  const groups = Object.keys(byGroup).sort();
+  const anyPlayed = groups.some(g => byGroup[g].some(r => r.P > 0));
+  $("standingsMeta").textContent = anyPlayed ? "· 3 pts win, 1 draw · top 2 (green) + best-third qualify" : "· no group games played yet";
+  $("standings").innerHTML = groups.map(g => `
+    <div class="stTable"><h3>GROUP ${g}</h3>
+      <div class="stRow head"><span></span><span>team</span><span class="c">P</span><span class="c">W</span><span class="c">L</span><span class="c">GD</span><span class="c">Pts</span></div>
+      ${byGroup[g].map((r, i) => `
+        <div class="stRow ${i < 2 ? "q" + (i + 1) : i === 2 ? "q3" : ""}">
+          <span class="c" style="color:var(--dim)">${i + 1}</span>
+          <span class="nm">${cap(r.slug)}</span>
+          <span class="c">${r.P}</span><span class="c">${r.W}</span><span class="c">${r.L}</span>
+          <span class="c">${r.GD > 0 ? "+" : ""}${r.GD}</span><span class="pts">${r.Pts}</span>
+        </div>`).join("")}
+    </div>`).join("");
+}
+
 /* ---------- tournament stats ---------- */
 async function loadStats() {
+  loadStandings();
   const d = await (await fetch("/api/leaders")).json();
   if (!d.available) {
     $("scorers").innerHTML = `<div class="statsEmpty">Stats feed unavailable (${d.reason ?? "no key"}).</div>`;
