@@ -236,6 +236,21 @@
   .stRow .pts { text-align: center; font-weight: 800; color: var(--accent); }
   .stRow.q1, .stRow.q2 { border-left: 2px solid var(--accent); padding-left: 4px; }
   .stRow.q3 { border-left: 2px solid var(--gold); padding-left: 4px; }
+  /* results list */
+  .resMatch { border: 1px solid var(--line); border-radius: 9px; margin: 6px 0; overflow: hidden; }
+  .resHead { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; background: #0a1018; }
+  .resHead:hover { background: #111c28; }
+  .resHead .tm { flex: 1; font-size: 13px; }
+  .resHead .tm.a { text-align: right; }
+  .resHead .sc { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; min-width: 46px; text-align: center; }
+  .resHead .dt { font-size: 10px; color: var(--dim); min-width: 42px; }
+  .resHead .ch { color: var(--dim); transition: transform .15s; }
+  .resMatch.open .resHead .ch { transform: rotate(90deg); }
+  .resBody { display: none; padding: 8px 14px; font-size: 12.5px; }
+  .resMatch.open .resBody { display: block; }
+  .evLine { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+  .evLine .m { width: 34px; text-align: right; color: var(--gold); font-weight: 700; }
+  .evLine .side { margin-left: auto; font-size: 10px; color: var(--dim); }
   .oddsPick { cursor: pointer; border-radius: 5px; transition: background .15s; }
   .oddsPick:hover { background: #1d2a3c; outline: 1px solid var(--accent); }
   .oddsPick.inSlip { background: #10b98126; outline: 1px solid var(--accent); font-weight: 700; }
@@ -506,6 +521,10 @@
     <div class="card" style="margin-bottom:14px">
       <h2>📊 Group standings — live <span style="text-transform:none;letter-spacing:0" id="standingsMeta"></span></h2>
       <div class="groupsGrid" id="standings"></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h2>⚽ Results — tap a match to see goals &amp; cards</h2>
+      <div id="resultsList"></div>
     </div>
     <div class="card" style="margin-bottom:14px">
       <h2>👑 Golden Boot race — top scorers <span style="text-transform:none;letter-spacing:0" id="statsMeta"></span></h2>
@@ -1049,9 +1068,47 @@ async function loadStandings() {
     </div>`).join("");
 }
 
+/* ---------- results with goal detail ---------- */
+async function loadResults() {
+  const rows = await (await fetch("/api/results")).json();
+  if (!rows.length) { $("resultsList").innerHTML = `<div class="statsEmpty">No finished matches yet.</div>`; return; }
+  $("resultsList").innerHTML = rows.map(m => `
+    <div class="resMatch" data-ev="${m.event}">
+      <div class="resHead">
+        <span class="dt">${m.date.slice(5, 10)}</span>
+        <span class="tm">${m.homeName}</span>
+        <span class="sc">${m.homeScore}–${m.awayScore}</span>
+        <span class="tm a">${m.awayName}</span>
+        <span class="ch">▶</span>
+      </div>
+      <div class="resBody"><div class="statsEmpty">tap to load…</div></div>
+    </div>`).join("");
+  for (const el of document.querySelectorAll(".resMatch")) {
+    el.querySelector(".resHead").addEventListener("click", () => toggleResult(el));
+  }
+}
+
+async function toggleResult(el) {
+  const open = el.classList.toggle("open");
+  if (!open || el.dataset.loaded) return;
+  el.dataset.loaded = "1";
+  const body = el.querySelector(".resBody");
+  const d = await (await fetch(`/api/match-events?event=${el.dataset.ev}`)).json();
+  if (!d.available) { body.innerHTML = `<div class="statsEmpty">${d.reason ?? "unavailable"}</div>`; return; }
+  if (!d.events.length) { body.innerHTML = `<div class="statsEmpty">No goal/card detail recorded.</div>`; return; }
+  body.innerHTML = d.events.map(e => `
+    <div class="evLine">
+      <span class="m">${e.minute ?? ""}${e.stoppage ? "+" + e.stoppage : ""}${e.minute ? "'" : ""}</span>
+      <span>${e.icon}</span>
+      <span>${e.text}${e.score ? ` <b style="color:var(--gold)">${e.score}</b>` : ""}</span>
+      <span class="side">${e.side ?? ""}</span>
+    </div>`).join("");
+}
+
 /* ---------- tournament stats ---------- */
 async function loadStats() {
   loadStandings();
+  loadResults();
   const d = await (await fetch("/api/leaders")).json();
   if (!d.available) {
     $("scorers").innerHTML = `<div class="statsEmpty">Stats feed unavailable (${d.reason ?? "no key"}).</div>`;

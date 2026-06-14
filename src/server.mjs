@@ -260,44 +260,62 @@ const server = createServer(async (req, res) => {
         json(res, 200, { available: false, reason: e.message });
       }
     } else if (url.pathname === "/api/standings") {
-      // live group tables from ingested World Cup results (3-1-0 points)
+      // live group tables from the SCHEDULE (freshest WC scores, 6h cache),
+      // not the slow daily ingest — finished games count immediately
       let groups = {};
       try { ({ groups } = await bracket()); } catch { groups = {}; }
       const teamGroup = {};
       for (const [g, slugs] of Object.entries(groups)) for (const s of slugs) teamGroup[s] = g;
-      const rows = {}; // slug -> stats
+      const rows = {};
       for (const [g, slugs] of Object.entries(groups))
         for (const s of slugs) rows[s] = { slug: s, group: g, P: 0, W: 0, D: 0, L: 0, GF: 0, GA: 0, Pts: 0 };
-      for (const m of allMatches) {
-        if (m.leagueName !== "World Cup") continue;
-        const hs = sideSlugCached(m, "home"), as = sideSlugCached(m, "away");
-        // only count if both teams are in the same group (group-stage games)
-        if (!rows[hs] || !rows[as] || teamGroup[hs] !== teamGroup[as]) continue;
+      const sched = await schedule();
+      for (const m of sched) {
+        if (m.status === "not_started" || m.homeScore == null) continue;
+        const hs = m.homeSlug, as = m.awaySlug;
+        if (!rows[hs] || !rows[as] || teamGroup[hs] !== teamGroup[as]) continue; // group games only
         const rh = rows[hs], ra = rows[as];
-        rh.P++; ra.P++; rh.GF += m.hg; rh.GA += m.ag; ra.GF += m.ag; ra.GA += m.hg;
-        if (m.hg > m.ag) { rh.W++; rh.Pts += 3; ra.L++; }
-        else if (m.hg < m.ag) { ra.W++; ra.Pts += 3; rh.L++; }
+        rh.P++; ra.P++; rh.GF += m.homeScore; rh.GA += m.awayScore; ra.GF += m.awayScore; ra.GA += m.homeScore;
+        if (m.homeScore > m.awayScore) { rh.W++; rh.Pts += 3; ra.L++; }
+        else if (m.homeScore < m.awayScore) { ra.W++; ra.Pts += 3; rh.L++; }
         else { rh.D++; ra.D++; rh.Pts++; ra.Pts++; }
       }
       const byGroup = {};
-      for (const r of Object.values(rows)) {
-        r.GD = r.GF - r.GA;
-        (byGroup[r.group] ??= []).push(r);
-      }
+      for (const r of Object.values(rows)) { r.GD = r.GF - r.GA; (byGroup[r.group] ??= []).push(r); }
       for (const g of Object.keys(byGroup))
         byGroup[g].sort((a, b) => b.Pts - a.Pts || b.GD - a.GD || b.GF - a.GF);
       json(res, 200, byGroup);
+    } else if (url.pathname === "/api/results") {
+      // finished matches with goal/card detail, newest first (timeline fetched on demand per match)
+      const sched = await schedule();
+      const finished = sched.filter(m => m.status !== "not_started" && m.homeScore != null)
+        .sort((a, b) => new Date(b.start) - new Date(a.start));
+      json(res, 200, finished.map(m => ({
+        event: m.event, date: m.start,
+        homeName: m.homeName, awayName: m.awayName,
+        homeScore: m.homeScore, awayScore: m.awayScore, status: m.status,
+      })));
+    } else if (url.pathname === "/api/match-events") {
+      // goal/card timeline for one finished match (single Sportradar call)
+      try {
+        const t = await timeline(url.searchParams.get("event"));
+        json(res, 200, {
+          available: true, homeScore: t.homeScore, awayScore: t.awayScore,
+          events: t.events.filter(e => ["score_change", "yellow_card", "red_card", "yellow_red_card", "substitution"].includes(e.type)),
+        });
+      } catch (e) { json(res, 200, { available: false, reason: e.message }); }
     } else if (url.pathname === "/api/team-goals") {
-      // GF/GA/GD per team from ingested World Cup results only
+      // GF/GA/GD per team from the live schedule (all completed WC matches)
       const tg = {};
-      for (const m of allMatches) {
-        if (m.leagueName !== "World Cup") continue;
-        const hs = sideSlugCached(m, "home"), as = sideSlugCached(m, "away");
+      const sched2 = await schedule();
+      for (const m of sched2) {
+        if (m.status === "not_started" || m.homeScore == null) continue;
+        const hs = m.homeSlug, as = m.awaySlug;
         if (ratings[hs] == null && ratings[as] == null) continue;
         (tg[hs] ??= { slug: hs, played: 0, gf: 0, ga: 0 });
         (tg[as] ??= { slug: as, played: 0, gf: 0, ga: 0 });
-        tg[hs].played++; tg[hs].gf += m.hg; tg[hs].ga += m.ag;
-        tg[as].played++; tg[as].gf += m.ag; tg[as].ga += m.hg;
+        tg[hs].played++; tg[hs].gf += m.homeScore; tg[hs].ga += m.awayScore;
+        tg[as].played++; tg[as].gf += m.awayScore; tg[as].ga += m.homeScore;
       }
       const out = Object.values(tg).map(t => ({ ...t, gd: t.gf - t.ga }))
         .sort((a, b) => b.gd - a.gd || b.gf - a.gf);
