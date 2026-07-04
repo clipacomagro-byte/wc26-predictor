@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-07-03T10:41:46.514Z",
+ "fetchedAt": "2026-07-04T07:07:42.777Z",
  "matches": [
   {
    "id": "sr:sport_event:71284962",
@@ -2896,6 +2896,45 @@
    "homeName": "Switzerland",
    "awayName": "Algeria",
    "hg": 2,
+   "ag": 0,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452503",
+   "ts": 1783101600,
+   "date": "2026-07-03",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Australia",
+   "awayName": "Egypt",
+   "hg": 1,
+   "ag": 1,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452569",
+   "ts": 1783116000,
+   "date": "2026-07-03",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Argentina",
+   "awayName": "Cape Verde",
+   "hg": 3,
+   "ag": 2,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452507",
+   "ts": 1783128600,
+   "date": "2026-07-04",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Colombia",
+   "awayName": "Ghana",
+   "hg": 1,
    "ag": 0,
    "leagueId": null,
    "leagueName": "World Cup"
