@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-07-06T08:08:02.831Z",
+ "fetchedAt": "2026-07-07T08:39:21.757Z",
  "matches": [
   {
    "id": "sr:sport_event:71284962",
@@ -2988,6 +2988,32 @@
    "awayName": "England",
    "hg": 2,
    "ag": 3,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452513",
+   "ts": 1783364400,
+   "date": "2026-07-06",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Portugal",
+   "awayName": "Spain",
+   "hg": 0,
+   "ag": 1,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452515",
+   "ts": 1783382400,
+   "date": "2026-07-07",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "USA",
+   "awayName": "Belgium",
+   "hg": 1,
+   "ag": 4,
    "leagueId": null,
    "leagueName": "World Cup"
   }
