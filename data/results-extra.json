@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-07-07T08:39:21.757Z",
+ "fetchedAt": "2026-07-09T08:08:13.312Z",
  "matches": [
   {
    "id": "sr:sport_event:71284962",
@@ -3014,6 +3014,32 @@
    "awayName": "Belgium",
    "hg": 1,
    "ag": 4,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452521",
+   "ts": 1783440000,
+   "date": "2026-07-07",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Argentina",
+   "awayName": "Egypt",
+   "hg": 3,
+   "ag": 2,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452523",
+   "ts": 1783454400,
+   "date": "2026-07-07",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Switzerland",
+   "awayName": "Colombia",
+   "hg": 0,
+   "ag": 0,
    "leagueId": null,
    "leagueName": "World Cup"
   }

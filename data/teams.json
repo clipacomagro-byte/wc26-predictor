@@ -1,5 +1,5 @@
 {
-  "built": "2026-07-07T08:39:28.286Z",
+  "built": "2026-07-09T08:08:22.975Z",
   "note": "48 qualified WC2026 teams",
   "ratings": {
     "australia": 1784,
@@ -14,7 +14,7 @@
     "algeria": 1711,
     "cape-verde": 1609,
     "dr-congo": 1663,
-    "egypt": 1734,
+    "egypt": 1728,
     "ghana": 1638,
     "ivory-coast": 1758,
     "morocco": 1942,
@@ -27,9 +27,9 @@
     "mexico": 1882,
     "panama": 1595,
     "usa": 1783,
-    "argentina": 2077,
+    "argentina": 2083,
     "brazil": 1972,
-    "colombia": 1916,
+    "colombia": 1913,
     "ecuador": 1794,
     "paraguay": 1708,
     "uruguay": 1789,
@@ -48,7 +48,7 @@
     "scotland": 1649,
     "spain": 2109,
     "sweden": 1661,
-    "switzerland": 1861,
+    "switzerland": 1863,
     "turkey": 1749
   }
 }
