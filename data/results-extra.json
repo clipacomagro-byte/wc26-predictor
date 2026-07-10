@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-07-09T08:08:13.312Z",
+ "fetchedAt": "2026-07-10T11:00:23.360Z",
  "matches": [
   {
    "id": "sr:sport_event:71284962",
@@ -3039,6 +3039,19 @@
    "homeName": "Switzerland",
    "awayName": "Colombia",
    "hg": 0,
+   "ag": 0,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452525",
+   "ts": 1783627200,
+   "date": "2026-07-09",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "France",
+   "awayName": "Morocco",
+   "hg": 2,
    "ag": 0,
    "leagueId": null,
    "leagueName": "World Cup"
