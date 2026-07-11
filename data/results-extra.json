@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-07-10T11:00:23.360Z",
+ "fetchedAt": "2026-07-11T08:45:03.095Z",
  "matches": [
   {
    "id": "sr:sport_event:71284962",
@@ -3053,6 +3053,19 @@
    "awayName": "Morocco",
    "hg": 2,
    "ag": 0,
+   "leagueId": null,
+   "leagueName": "World Cup"
+  },
+  {
+   "id": "sr:sport_event:53452527",
+   "ts": 1783710000,
+   "date": "2026-07-10",
+   "homeSlug": null,
+   "awaySlug": null,
+   "homeName": "Spain",
+   "awayName": "Belgium",
+   "hg": 2,
+   "ag": 1,
    "leagueId": null,
    "leagueName": "World Cup"
   }
