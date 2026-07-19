@@ -37,9 +37,19 @@ export async function schedule({ force = false } = {}) {
       (Date.now() - statSync(SCHEDULE_CACHE).mtimeMs) / 60000 < SCHEDULE_MAX_AGE_MIN) {
     raw = JSON.parse(readFileSync(SCHEDULE_CACHE, "utf8"));
   } else {
-    raw = await sr(`/seasons/${WC_SEASON}/schedules.json`);
-    mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(SCHEDULE_CACHE, JSON.stringify(raw));
+    try {
+      raw = await sr(`/seasons/${WC_SEASON}/schedules.json`);
+      mkdirSync(CACHE_DIR, { recursive: true });
+      writeFileSync(SCHEDULE_CACHE, JSON.stringify(raw));
+    } catch (e) {
+      // Upstream unreachable (e.g. trial key expired → 403). Serve the last
+      // cached schedule if we have one rather than 400ing the whole board.
+      if (existsSync(SCHEDULE_CACHE)) {
+        raw = JSON.parse(readFileSync(SCHEDULE_CACHE, "utf8"));
+      } else {
+        throw e;
+      }
+    }
   }
   return raw.schedules.map(s => {
     const [h, a] = s.sport_event.competitors;
